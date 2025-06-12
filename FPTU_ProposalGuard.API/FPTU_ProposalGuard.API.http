@@ -1,0 +1,6 @@
+@FPTU_ProposalGuard.API_HostAddress = http://localhost:5124
+
+GET {{FPTU_ProposalGuard.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
