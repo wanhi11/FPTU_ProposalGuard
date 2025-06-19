@@ -1,6 +1,7 @@
-﻿using FPTU_ProposalGuard.Domain.Common.Enums;
+﻿using FPTU_ProposalGuard.Application.Dtos.Users;
+using FPTU_ProposalGuard.Domain.Common.Enums;
 
-namespace FPTU_ProposalGuard.Application.Dtos;
+namespace FPTU_ProposalGuard.Application.Dtos.Notifications;
 
 public class NotificationDto
 {

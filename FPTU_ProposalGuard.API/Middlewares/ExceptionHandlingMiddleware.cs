@@ -4,7 +4,7 @@ using Newtonsoft.Json;
 using System.Net;
 using FPTU_ProposalGuard.Application.Exceptions;
 
-namespace FPTU_ELibrary.API.Middlewares
+namespace FPTU_ProposalGuard.API.Middlewares
 {
     //  Summary:
     //      This act as exception handling middleware, where it will 

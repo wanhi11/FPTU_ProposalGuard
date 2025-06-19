@@ -6,7 +6,7 @@ public class User
 
     public string Email { get; set; } = null!;
 
-    public string PasswordHash { get; set; } = null!;
+    public string? PasswordHash { get; set; }
 
     public string? FirstName { get; set; }
 
@@ -17,6 +17,8 @@ public class User
     public string? Phone { get; set; }
 
     public string? Avatar { get; set; }
+    
+    public string? Address { get; set; }
 
     public string? Gender { get; set; }
 
@@ -41,7 +43,7 @@ public class User
     public string? TwoFactorBackupCodes { get; set; }
 
     public string? PhoneVerificationCode { get; set; }
-
+    public string? EmailVerificationCode { get; set; }
     public DateTime? PhoneVerificationExpiry { get; set; }
 
     public int RoleId { get; set; }

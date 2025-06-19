@@ -1,6 +1,6 @@
 ﻿using FPTU_ProposalGuard.Domain.Interfaces;
 
-namespace FPTU_ELibrary.API.Extensions
+namespace FPTU_ProposalGuard.API.Extensions
 {
 	public static class InitializeExtensions
     {

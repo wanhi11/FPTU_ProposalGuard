@@ -35,6 +35,9 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(e => e.Gender)
             .HasMaxLength(50)
             .HasColumnName("gender");
+        builder.Property(e => e.Address)
+            .HasMaxLength(255)
+            .HasColumnName("address");
         builder.Property(e => e.IsActive)
             .HasDefaultValue(true)
             .HasColumnName("is_active");
@@ -58,6 +61,12 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(e => e.PhoneVerificationCode)
             .HasMaxLength(20)
             .HasColumnName("phone_verification_code");
+        builder.Property(e => e.EmailVerificationCode)
+            .HasMaxLength(100)
+            .HasColumnName("email_verification_code");
+        builder.Property(e => e.TwoFactorBackupCodes)
+            .HasMaxLength(255)
+            .HasColumnName("two_factory_backup_codes");
         builder.Property(e => e.PhoneVerificationExpiry)
             .HasColumnType("datetime")
             .HasColumnName("phone_verification_expiry");

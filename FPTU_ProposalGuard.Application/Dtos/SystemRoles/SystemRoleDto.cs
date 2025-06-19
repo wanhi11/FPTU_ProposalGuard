@@ -1,4 +1,4 @@
-﻿namespace FPTU_ProposalGuard.Application.Dtos;
+﻿namespace FPTU_ProposalGuard.Application.Dtos.SystemRoles;
 
 public class SystemRoleDto
 {

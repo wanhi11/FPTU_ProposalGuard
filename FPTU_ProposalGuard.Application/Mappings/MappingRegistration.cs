@@ -1,4 +1,7 @@
 ﻿using FPTU_ProposalGuard.Application.Dtos;
+using FPTU_ProposalGuard.Application.Dtos.Notifications;
+using FPTU_ProposalGuard.Application.Dtos.SystemRoles;
+using FPTU_ProposalGuard.Application.Dtos.Users;
 using FPTU_ProposalGuard.Domain.Entities;
 using Mapster;
 

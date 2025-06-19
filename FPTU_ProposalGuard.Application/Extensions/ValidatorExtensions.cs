@@ -1,6 +1,8 @@
 ﻿using FluentValidation;
 using FluentValidation.Results;
 using FPTU_ProposalGuard.Application.Dtos;
+using FPTU_ProposalGuard.Application.Dtos.Authentications;
+using FPTU_ProposalGuard.Application.Dtos.Notifications;
 using FPTU_ProposalGuard.Application.Validations;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -50,6 +52,7 @@ public static class ValidatorExtensions
 				// Create instances of the validators, passing the language 
 				{ } when typeof(T) == typeof(IFormFile) => (IValidator<T>)new ExcelValidator(),
                 { } when typeof(T) == typeof(NotificationDto) => (IValidator<T>)new NotificationDtoValidator(),
+                { } when typeof(T) == typeof(RefreshTokenDto) => (IValidator<T>)new RefreshTokenDtoValidator(),
 				_ => null
 			};
 		}

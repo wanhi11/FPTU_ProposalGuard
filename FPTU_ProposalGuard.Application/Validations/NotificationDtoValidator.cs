@@ -1,5 +1,6 @@
 ﻿using FluentValidation;
 using FPTU_ProposalGuard.Application.Dtos;
+using FPTU_ProposalGuard.Application.Dtos.Notifications;
 
 namespace FPTU_ProposalGuard.Application.Validations;
 

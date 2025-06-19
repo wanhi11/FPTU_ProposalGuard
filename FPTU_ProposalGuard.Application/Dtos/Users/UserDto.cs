@@ -1,4 +1,7 @@
-﻿namespace FPTU_ProposalGuard.Application.Dtos;
+﻿using FPTU_ProposalGuard.Application.Dtos.Notifications;
+using FPTU_ProposalGuard.Application.Dtos.SystemRoles;
+
+namespace FPTU_ProposalGuard.Application.Dtos.Users;
 
 public class UserDto
 {
@@ -17,6 +20,8 @@ public class UserDto
     public string? Phone { get; set; }
 
     public string? Avatar { get; set; }
+    
+    public string? Address { get; set; }
 
     public string? Gender { get; set; }
 
@@ -35,6 +40,7 @@ public class UserDto
     public bool PhoneNumberConfirmed { get; set; }
 
     public bool EmailConfirmed { get; set; }
+    public string? EmailVerificationCode { get; set; }
 
     public string? TwoFactorSecretKey { get; set; }
 

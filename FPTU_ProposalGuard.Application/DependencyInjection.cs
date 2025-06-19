@@ -1,6 +1,11 @@
 ﻿using System.Reflection;
 using FPTU_ProposalGuard.Application.Dtos;
+using FPTU_ProposalGuard.Application.Dtos.Authentications;
+using FPTU_ProposalGuard.Application.Dtos.Notifications;
+using FPTU_ProposalGuard.Application.Dtos.SystemRoles;
+using FPTU_ProposalGuard.Application.Dtos.Users;
 using FPTU_ProposalGuard.Application.Services;
+using FPTU_ProposalGuard.Application.Services.IExternalServices;
 using FPTU_ProposalGuard.Domain.Interfaces.Services;
 using FPTU_ProposalGuard.Domain.Interfaces.Services.Base;
 using Mapster;
@@ -16,11 +21,15 @@ public static class DependencyInjection
     public static IServiceCollection AddApplication(this IServiceCollection services, IConfiguration configuration)
     {
         // Register external services
+        services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<ISystemMessageService, SystemMessageService>();
         // Register application services
         services.AddScoped(typeof(IGenericService<,,>), typeof(GenericService<,,>));
         services.AddScoped(typeof(IReadOnlyService<,,>), typeof(ReadOnlyService<,,>));
         services.AddScoped<INotificationService<NotificationDto>, NotificationService>();
+        services.AddScoped<IRefreshTokenService<RefreshTokenDto>, RefreshTokenService>();
+        services.AddScoped<IUserService<UserDto>, UserService>();
+        services.AddScoped<ISystemRoleService<SystemRoleDto>, SystemRoleService>();
 
         return services
             .ConfigureMapster() // Add mapster

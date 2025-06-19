@@ -16,6 +16,9 @@ public class SystemRoleConfiguration : IEntityTypeConfiguration<SystemRole>
         builder.Property(e => e.NormalizedName)
             .HasMaxLength(155)
             .HasColumnName("normalized_name");
+        builder.Property(e => e.Description)
+            .HasMaxLength(155)
+            .HasColumnName("description");
         builder.Property(e => e.RoleName)
             .HasMaxLength(155)
             .HasColumnName("role_name");

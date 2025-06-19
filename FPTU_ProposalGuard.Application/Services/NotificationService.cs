@@ -1,5 +1,6 @@
 ﻿using FPTU_ProposalGuard.Application.Common;
 using FPTU_ProposalGuard.Application.Dtos;
+using FPTU_ProposalGuard.Application.Dtos.Notifications;
 using FPTU_ProposalGuard.Domain.Entities;
 using FPTU_ProposalGuard.Domain.Interfaces;
 using FPTU_ProposalGuard.Domain.Interfaces.Services;

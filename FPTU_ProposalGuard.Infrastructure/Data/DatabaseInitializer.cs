@@ -1,4 +1,8 @@
-﻿using FPTU_ProposalGuard.Domain.Interfaces;
+﻿using System.ComponentModel;
+using System.Reflection;
+using FPTU_ProposalGuard.Domain.Common.Enums;
+using FPTU_ProposalGuard.Domain.Entities;
+using FPTU_ProposalGuard.Domain.Interfaces;
 using FPTU_ProposalGuard.Infrastructure.Data.Context;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -53,13 +57,76 @@ public class DatabaseInitializer(FptuProposalGuardDbContext context, ILogger log
     {
         try
         {
-            // Seed data here...
-            await Task.CompletedTask;
+            if (!await context.Users.AnyAsync()) await SeedUserRoleAsync();
         }
         catch (Exception ex)
         {
             logger.Error(ex, "An error occurred while performing seed data.");
         }
+    }
+
+    private async Task SeedUserRoleAsync()
+    {
+        List<SystemRole> roles = new()
+        {
+            new()
+            {
+                RoleName = nameof(Role.Administration),
+                NormalizedName = nameof(Role.Administration).ToUpper(),
+                Description = Role.Administration.GetDescription()
+            },
+            new()
+            {
+                RoleName = nameof(Role.Reviewer),
+                NormalizedName = nameof(Role.Reviewer).ToUpper(),
+                Description = Role.Reviewer.GetDescription()
+            },
+            new()
+            {
+                RoleName = nameof(Role.Lecturer),
+                NormalizedName = nameof(Role.Lecturer).ToUpper(),
+                Description = Role.Lecturer.GetDescription()
+            }
+        };
+        // Add range
+        await context.AddRangeAsync(roles);
+        // Save DB
+        var isSaved = await context.SaveChangesAsync() > 0;
+        if (isSaved) logger.Information($"[ROLE] Seed {roles} data successfully");
+        else return;
+        
+        List<User> users = new()
+        {
+            new()
+            {
+                Email = "admin@gmail.com",
+                FirstName = "Admin",
+                PasswordHash = BC.EnhancedHashPassword("@Admin123", 13),
+                IsActive = true,
+                EmailConfirmed = true,
+                IsDeleted = false,
+                CreateDate = DateTime.UtcNow,
+                TwoFactorEnabled = false,
+                RoleId = roles.First(r => r.RoleName == nameof(Role.Administration)).RoleId
+            }
+        };
+        
+        // Add range
+        await context.AddRangeAsync(users);
+        // Save change
+        isSaved = await context.SaveChangesAsync() > 0;
+        if(isSaved) logger.Information($"[USER] Seed {users} data successfully");
+    }
+}
+
+public static class DatabaseInitializerExtensions
+{
+    public static string GetDescription(this System.Enum value)
+    {
+        var field = value.GetType().GetField(value.ToString());
+        var attribute = field?.GetCustomAttribute<DescriptionAttribute>();
+
+        return attribute?.Description ?? value.ToString();
     }
 }
 

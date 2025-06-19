@@ -1,8 +1,10 @@
 ﻿using FPTU_ProposalGuard.API.Extensions;
 using FPTU_ProposalGuard.API.Payloads;
 using FPTU_ProposalGuard.API.Payloads.Requests;
+using FPTU_ProposalGuard.API.Payloads.Requests.Notifications;
 using FPTU_ProposalGuard.Application.Configurations;
 using FPTU_ProposalGuard.Application.Dtos;
+using FPTU_ProposalGuard.Application.Dtos.Notifications;
 using FPTU_ProposalGuard.Domain.Interfaces.Services;
 using FPTU_ProposalGuard.Domain.Specifications;
 using FPTU_ProposalGuard.Domain.Specifications.Params;

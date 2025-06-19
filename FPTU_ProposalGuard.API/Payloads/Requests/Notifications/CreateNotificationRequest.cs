@@ -1,6 +1,6 @@
 ﻿using FPTU_ProposalGuard.Domain.Common.Enums;
 
-namespace FPTU_ProposalGuard.API.Payloads.Requests;
+namespace FPTU_ProposalGuard.API.Payloads.Requests.Notifications;
 
 public class CreateNotificationRequest
 {

@@ -15,6 +15,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
         <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.2">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -31,5 +32,7 @@
         <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="9.0.0" />
         <PackageReference Include="Serilog.AspNetCore" Version="8.0.2" />
     </ItemGroup>
-    
+    <ItemGroup>
+        <Using Include="BCrypt.Net.BCrypt" Alias="BC" />
+    </ItemGroup>
 </Project>
