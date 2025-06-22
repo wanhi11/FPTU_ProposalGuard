@@ -47,7 +47,7 @@ namespace FPTU_ProposalGuard.API.Extensions
             app.UseSwaggerUI(c =>
             {
                 c.SwaggerEndpoint("/swagger/v1/swagger.json",
-                    "FPTU_ELibraryManagement API V1");
+                    "FPTU_ProposalGuardManagement API V1");
             });
 
             return app;

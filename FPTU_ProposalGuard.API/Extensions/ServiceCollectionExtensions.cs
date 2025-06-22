@@ -128,8 +128,7 @@ namespace FPTU_ProposalGuard.API.Extensions
                 // Disable Https required for the metadata address or authority
                 options.RequireHttpsMetadata = false;
                 // Define type and definitions required for validating a token
-                options.TokenValidationParameters = services.BuildServiceProvider()
-                    .GetRequiredService<TokenValidationParameters>();
+                options.TokenValidationParameters = tokenValidationParameters;
                 options.Events = new JwtBearerEvents
                 {
                     OnMessageReceived = context =>

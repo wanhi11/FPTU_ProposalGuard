@@ -3,7 +3,7 @@ using FPTU_ProposalGuard.Domain.Interfaces.Services.Base;
 
 namespace FPTU_ProposalGuard.Domain.Interfaces.Services;
 
-public interface IUserService<TDto> : IGenericService<TDto, User, Guid>
+public interface IUserService<TDto> : IGenericService<User, TDto, Guid>
     where TDto : class
 {
     Task<IServiceResult> GetCurrentUserAsync(string email);
@@ -23,4 +23,9 @@ public interface IUserService<TDto> : IGenericService<TDto, User, Guid>
     Task<IServiceResult> ValidateMfaBackupCodeAsync(string email, string backupCode);
     Task<IServiceResult> RegenerateMfaBackupCodeAsync(string email);
     Task<IServiceResult> ConfirmRegenerateMfaBackupCodeAsync(string email, string otp, string token);
+    Task<IServiceResult> SoftDeleteAsync(Guid userId);
+    Task<IServiceResult> SoftDeleteRangeAsync(Guid[] userIds);
+    Task<IServiceResult> UndoDeleteAsync(Guid userId);
+    Task<IServiceResult> UndoDeleteRangeAsync(Guid[] userIds);
+    Task<IServiceResult> DeleteRangeAsync(Guid[] userIds);
 }

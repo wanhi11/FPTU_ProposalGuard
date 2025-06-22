@@ -25,7 +25,34 @@ public static class PayloadExtensions
     #endregion
     
     #region Users
-
+    public static UserDto ToUserDto(this CreateUserRequest req)
+    {
+        return new()
+        {
+            FirstName = req.FirstName,
+            LastName = req.LastName,
+            Dob = req.Dob,
+            Phone = req.Phone,
+            Address = req.Address,
+            Gender = req.Gender.ToString(),
+            RoleId = req.RoleId
+        };
+    }
+    
+    public static UserDto ToUserDto(this UpdateUserRequest req)
+    {
+        return new()
+        {
+            FirstName = req.FirstName,
+            LastName = req.LastName,
+            Dob = req.Dob,
+            Phone = req.Phone,
+            Address = req.Address,
+            Gender = req.Gender.ToString(),
+            Avatar = req.Avatar
+        };
+    }
+    
     public static UserDto ToUserDto(this UpdateProfileRequest req, string email)
     {
         return new()

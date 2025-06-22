@@ -23,6 +23,7 @@ using Google.Apis.Auth.OAuth2.Responses;
 using Google.Apis.Util;
 using Mapster;
 using MapsterMapper;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
@@ -31,9 +32,10 @@ using Serilog;
 
 namespace FPTU_ProposalGuard.Application.Services;
 
-public class UserService : GenericService<UserDto, User, Guid>, IUserService<UserDto>
+public class UserService : GenericService<User, UserDto, Guid>, IUserService<UserDto>
 {
     private readonly IGenericRepository<User, Guid> _userRepository;
+    private readonly IGenericRepository<SystemRole, int> _roleRepository;
     
     private readonly AppSettings _appSettings;
     private readonly WebTokenSettings _webTokenSettings;
@@ -61,6 +63,7 @@ public class UserService : GenericService<UserDto, User, Guid>, IUserService<Use
     : base(msgService, unitOfWork, mapper, logger)
     {
         _userRepository = unitOfWork.Repository<User, Guid>();
+        _roleRepository = unitOfWork.Repository<SystemRole, int>();
         
         _httpClient = httpClient;
         _appSettings = monitor3.CurrentValue;
@@ -73,6 +76,93 @@ public class UserService : GenericService<UserDto, User, Guid>, IUserService<Use
         _refreshTokenService = refreshTokenService;
     }
 
+    public override async Task<IServiceResult> CreateAsync(UserDto dto)
+    {
+	    try
+	    {
+		    // Validate inputs using the generic validator
+		    var validationResult = await ValidatorExtensions.ValidateAsync(dto);
+		    // Check for valid validations
+		    if (validationResult != null && !validationResult.IsValid)
+		    {
+			    // Convert ValidationResult to ValidationProblemsDetails.Errors
+			    var errors = validationResult.ToProblemDetails().Errors;
+			    throw new UnprocessableEntityException("Invalid Validations", errors);
+		    }
+		    
+		    // Check role existence
+		    var roleEntity = await _roleRepository.GetByIdAsync(dto.RoleId);
+		    if (roleEntity == null)
+		    {
+			    // Not found
+			    var errMsg = await _msgService.GetMessageAsync(ResultCodeConst.SYS_Warning0002);
+			    return new ServiceResult(
+				    resultCode: ResultCodeConst.SYS_Warning0002,
+				    message: StringUtils.Format(errMsg, "vai trò"));
+		    }
+		    
+		    // Add new entity
+		    await _userRepository.AddAsync(_mapper.Map<User>(dto));
+		    // Save DB
+		    var isSaved = await _unitOfWork.SaveChangesAsync() > 0;
+		    if (isSaved)
+		    {
+			    // Create successfully
+			    return new ServiceResult(
+				    resultCode: ResultCodeConst.SYS_Success0001,
+				    message: await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0001),
+				    data: true);
+		    }
+		    
+		    // Failed to create
+		    return new ServiceResult(
+			    resultCode: ResultCodeConst.SYS_Fail0001,
+			    message: await _msgService.GetMessageAsync(ResultCodeConst.SYS_Fail0001),
+			    data: false);
+	    }
+	    catch (Exception ex)
+	    {
+		    _logger.Error(ex, ex.Message);
+		    throw new Exception("Error invoke when process create user");
+	    }
+    }
+
+    public override async Task<IServiceResult> GetByIdAsync(Guid id)
+    {
+	    // Build spec
+	    var baseSpec = new BaseSpecification<User>(u => u.UserId.Equals(id));
+	    // Apply include
+	    baseSpec.ApplyInclude(u => u.Include(u => u.Role));
+	    // Get user by query specification
+	    var existedUser = await _unitOfWork.Repository<User, Guid>().GetWithSpecAsync(baseSpec);
+	    if (existedUser is null)
+	    {
+		    // Data not found or empty
+		    return new ServiceResult(ResultCodeConst.SYS_Warning0004,
+			    await _msgService.GetMessageAsync(ResultCodeConst.SYS_Warning0004));
+	    }
+
+	    // Define a local Mapster configuration
+	    var localConfig = new TypeAdapterConfig();
+	    localConfig.NewConfig<User, UserDto>()
+		    .Ignore(dest => dest.PasswordHash!)
+		    .Ignore(dest => dest.RoleId)
+		    .Ignore(dest => dest.EmailConfirmed)
+		    .Ignore(dest => dest.TwoFactorEnabled)
+		    .Ignore(dest => dest.PhoneNumberConfirmed)
+		    .Ignore(dest => dest.TwoFactorSecretKey!)
+		    .Ignore(dest => dest.TwoFactorBackupCodes!)
+		    .Ignore(dest => dest.PhoneVerificationCode!)
+		    .Ignore(dest => dest.EmailVerificationCode!)
+		    .Ignore(dest => dest.PhoneVerificationExpiry!)
+		    .Map(dto => dto.Role, src => src.Role)
+		    .AfterMapping((src, dest) => { dest.Role.RoleId = 0; });
+
+	    return new ServiceResult(ResultCodeConst.SYS_Success0002,
+		    await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0002),
+		    existedUser.Adapt<UserDto>(localConfig));
+    }
+    
     public async Task<IServiceResult> GetCurrentUserAsync(string email)
 	{
 		try
@@ -1155,6 +1245,274 @@ public class UserService : GenericService<UserDto, User, Guid>, IUserService<Use
 		}
 	}
     
+    public async Task<IServiceResult> SoftDeleteAsync(Guid userId)
+	{
+		try
+		{
+			// Check exist user
+			var existingEntity = await _unitOfWork.Repository<User, Guid>().GetByIdAsync(userId);
+			// Check if user account already mark as deleted
+			if (existingEntity == null || existingEntity.IsDeleted)
+			{
+				var errMsg = await _msgService.GetMessageAsync(ResultCodeConst.SYS_Warning0002);
+				return new ServiceResult(ResultCodeConst.SYS_Warning0002,
+					StringUtils.Format(errMsg, "user"));
+			}
+
+			// Update delete status
+			existingEntity.IsDeleted = true;
+
+			// Save changes to DB
+			var rowsAffected = await _unitOfWork.SaveChangesAsync();
+			if (rowsAffected == 0)
+			{
+				// Get error msg
+				return new ServiceResult(ResultCodeConst.SYS_Fail0004,
+					await _msgService.GetMessageAsync(ResultCodeConst.SYS_Fail0004));
+			}
+
+			// Mark as update success
+			return new ServiceResult(ResultCodeConst.SYS_Success0007,
+				await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0007));
+		}
+		catch (Exception ex)
+		{
+			_logger.Error(ex.Message);
+			throw new Exception("Error invoke when process soft delete user");
+		}
+	}
+
+	public async Task<IServiceResult> SoftDeleteRangeAsync(Guid[] userIds)
+	{
+		try
+		{
+			// Get all matching user 
+			// Build spec
+			var baseSpec = new BaseSpecification<User>(e => userIds.Contains(e.UserId));
+			var userEntities = await _unitOfWork.Repository<User, Guid>()
+				.GetAllWithSpecAsync(baseSpec);
+			// Check if any data already soft delete
+			var userList = userEntities.ToList();
+			if (userList.Any(x => x.IsDeleted))
+			{
+				return new ServiceResult(ResultCodeConst.SYS_Fail0004,
+					await _msgService.GetMessageAsync(ResultCodeConst.SYS_Fail0004));
+			}
+
+			// Progress update deleted status to true
+			userList.ForEach(x => x.IsDeleted = true);
+
+			// Save changes to DB
+			var rowsAffected = await _unitOfWork.SaveChangesAsync();
+			if (rowsAffected == 0)
+			{
+				// Get error msg
+				return new ServiceResult(ResultCodeConst.SYS_Fail0004,
+					await _msgService.GetMessageAsync(ResultCodeConst.SYS_Fail0004));
+			}
+
+			// Mark as update success
+			return new ServiceResult(ResultCodeConst.SYS_Success0007,
+				await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0007));
+		}
+		catch (Exception ex)
+		{
+			_logger.Error(ex.Message);
+			throw new Exception("Error invoke when remove range user");
+		}
+	}
+
+	public async Task<IServiceResult> UndoDeleteAsync(Guid userId)
+	{
+		try
+		{
+			// Check exist user
+			var existingEntity = await _unitOfWork.Repository<User, Guid>().GetByIdAsync(userId);
+			// Check if user account already mark as deleted
+			if (existingEntity == null || !existingEntity.IsDeleted)
+			{
+				var errMsg = await _msgService.GetMessageAsync(ResultCodeConst.SYS_Warning0002);
+				return new ServiceResult(ResultCodeConst.SYS_Warning0002,
+					StringUtils.Format(errMsg, "user"));
+			}
+
+			// Update delete status
+			existingEntity.IsDeleted = false;
+
+			// Save changes to DB
+			var rowsAffected = await _unitOfWork.SaveChangesAsync();
+			if (rowsAffected == 0)
+			{
+				return new ServiceResult(ResultCodeConst.SYS_Fail0004,
+					await _msgService.GetMessageAsync(ResultCodeConst.SYS_Fail0004));
+			}
+
+			// Mark as update success
+			return new ServiceResult(ResultCodeConst.SYS_Success0009,
+				await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0009));
+		}
+		catch (Exception ex)
+		{
+			_logger.Error(ex.Message);
+			throw new Exception("Error invoke when process undo delete user");
+		}
+	}
+
+	public async Task<IServiceResult> UndoDeleteRangeAsync(Guid[] userIds)
+	{
+		try
+		{
+			// Get all matching user 
+			// Build spec
+			var baseSpec = new BaseSpecification<User>(e => userIds.Contains(e.UserId));
+			var userEntities = await _unitOfWork.Repository<User, Guid>()
+				.GetAllWithSpecAsync(baseSpec);
+			// Check if any data already soft delete
+			var userList = userEntities.ToList();
+			if (userList.Any(x => !x.IsDeleted))
+			{
+				return new ServiceResult(ResultCodeConst.SYS_Fail0004,
+					await _msgService.GetMessageAsync(ResultCodeConst.SYS_Fail0004));
+			}
+
+			// Progress undo deleted status to false
+			userList.ForEach(x => x.IsDeleted = false);
+
+			// Save changes to DB
+			var rowsAffected = await _unitOfWork.SaveChangesAsync();
+			if (rowsAffected == 0)
+			{
+				// Get error msg
+				return new ServiceResult(ResultCodeConst.SYS_Fail0004,
+					await _msgService.GetMessageAsync(ResultCodeConst.SYS_Fail0004));
+			}
+
+			// Mark as update success
+			return new ServiceResult(ResultCodeConst.SYS_Success0009,
+				await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0009));
+		}
+		catch (Exception ex)
+		{
+			_logger.Error(ex.Message);
+			throw new Exception("Error invoke when process undo delete range");
+		}
+	}
+    
+	public override async Task<IServiceResult> DeleteAsync(Guid id)
+	{
+		// Initiate service result
+		var serviceResult = new ServiceResult();
+
+		try
+		{
+			// Retrieve the entity
+			var existingEntity = await _unitOfWork.Repository<User, Guid>().GetByIdAsync(id);
+			if (existingEntity == null)
+			{
+				var errMsg = await _msgService.GetMessageAsync(ResultCodeConst.SYS_Warning0002);
+				return new ServiceResult(ResultCodeConst.SYS_Warning0002,
+					StringUtils.Format(errMsg, "user"));
+			}
+
+			// Check whether user in the trash bin
+			if (!existingEntity.IsDeleted)
+			{
+				return new ServiceResult(ResultCodeConst.SYS_Fail0004,
+					await _msgService.GetMessageAsync(ResultCodeConst.SYS_Fail0004));
+			}
+
+			// Process add delete entity
+			await _unitOfWork.Repository<User, Guid>().DeleteAsync(id);
+			// Save to DB
+			if (await _unitOfWork.SaveChangesAsync() > 0)
+			{
+				return new ServiceResult(ResultCodeConst.SYS_Success0004,
+					await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0004));
+			}
+			else
+			{
+				serviceResult.ResultCode = ResultCodeConst.SYS_Fail0004;
+				serviceResult.Message = await _msgService.GetMessageAsync(ResultCodeConst.SYS_Fail0004);
+				serviceResult.Data = false;
+			}
+		}
+		catch (DbUpdateException ex)
+		{
+			if (ex.InnerException is SqlException sqlEx)
+			{
+				switch (sqlEx.Number)
+				{
+					case 547: // Foreign key constraint violation
+						return new ServiceResult(ResultCodeConst.SYS_Fail0007,
+							await _msgService.GetMessageAsync(ResultCodeConst.SYS_Fail0007));
+				}
+			}
+
+			// Throw if other issues
+			throw;
+		}
+		catch (Exception ex)
+		{
+			_logger.Error(ex.Message);
+			throw new Exception("Error invoke when process delete user");
+		}
+
+		return serviceResult;
+	}
+	
+	public async Task<IServiceResult> DeleteRangeAsync(Guid[] userIds)
+	{
+		try
+		{
+			// Get all matching user 
+			// Build spec
+			var baseSpec = new BaseSpecification<User>(e => userIds.Contains(e.UserId));
+			var userEntities = await _unitOfWork.Repository<User, Guid>()
+				.GetAllWithSpecAsync(baseSpec);
+			// Check if any data already soft delete
+			var userList = userEntities.ToList();
+			if (userList.Any(x => !x.IsDeleted))
+			{
+				return new ServiceResult(ResultCodeConst.SYS_Fail0004,
+					await _msgService.GetMessageAsync(ResultCodeConst.SYS_Fail0004));
+			}
+
+			// Process delete range
+			await _unitOfWork.Repository<User, Guid>().DeleteRangeAsync(userIds);
+			// Save to DB
+			if (await _unitOfWork.SaveChangesAsync() > 0)
+			{
+				var msg = await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0008);
+				return new ServiceResult(ResultCodeConst.SYS_Success0008,
+					StringUtils.Format(msg, userList.Count.ToString()), true);
+			}
+
+			// Fail to delete
+			return new ServiceResult(ResultCodeConst.SYS_Fail0004,
+				await _msgService.GetMessageAsync(ResultCodeConst.SYS_Fail0004), false);
+		}
+		catch (DbUpdateException ex)
+		{
+			if (ex.InnerException is SqlException sqlEx)
+			{
+				switch (sqlEx.Number)
+				{
+					case 547: // Foreign key constraint violation
+						return new ServiceResult(ResultCodeConst.SYS_Fail0007,
+							await _msgService.GetMessageAsync(ResultCodeConst.SYS_Fail0007));
+				}
+			}
+
+			// Throw if other issues
+			throw new Exception("Error invoke when process delete range user");
+		}
+		catch (Exception ex)
+		{
+			_logger.Error(ex.Message);
+			throw new Exception("Error invoke when process delete range user");
+		}
+	}
+	
     // Send email (confirmation/OTP)
     private async Task<bool> SendAndSaveOtpAsync(string otpCode, User user,
         string subject, string emailContent)

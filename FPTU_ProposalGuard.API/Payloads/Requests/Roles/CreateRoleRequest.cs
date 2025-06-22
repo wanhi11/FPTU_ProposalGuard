@@ -1,11 +1,8 @@
-﻿namespace FPTU_ProposalGuard.Application.Dtos.SystemRoles;
+﻿namespace FPTU_ProposalGuard.API.Payloads.Requests.Roles;
 
-public class SystemRoleDto
+public class CreateRoleRequest
 {
-    public int RoleId { get; set; }
-
     public string RoleName { get; set; } = null!;
     public string Description { get; set; } = null!;
-
     public string NormalizedName { get; set; } = null!;
 }

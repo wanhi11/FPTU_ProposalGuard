@@ -108,6 +108,19 @@ public class DatabaseInitializer(FptuProposalGuardDbContext context, ILogger log
                 CreateDate = DateTime.UtcNow,
                 TwoFactorEnabled = false,
                 RoleId = roles.First(r => r.RoleName == nameof(Role.Administration)).RoleId
+            },
+            new()
+            {
+                Email = "doanvietthanhhs@gmail.com",
+                FirstName = "Chu",
+                LastName = "Be",
+                PasswordHash = BC.EnhancedHashPassword("@Admin123", 13),
+                IsActive = true,
+                EmailConfirmed = true,
+                IsDeleted = false,
+                CreateDate = DateTime.UtcNow,
+                TwoFactorEnabled = false,
+                RoleId = roles.First(r => r.RoleName == nameof(Role.Administration)).RoleId
             }
         };
         
