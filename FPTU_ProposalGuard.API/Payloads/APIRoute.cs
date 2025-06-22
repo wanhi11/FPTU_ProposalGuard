@@ -27,15 +27,14 @@ public class APIRoute
         public const string RegenerateBackupCode = Base + "/auth/regenerate-mfa-backup";
         public const string RegenerateBackupCodeConfirm = Base + "/auth/regenerate-mfa-backup/confirm";
         // [PATCH]
-        public const string ConfirmRegistration = Base + "/auth/sign-up/confirm";
         public const string ChangePassword = Base + "/auth/change-password";
-        public const string ChangePasswordAsEmployee = Base + "/auth/employee/change-password";
         // [PUT]
         public const string UpdateProfile = Base + "/auth/profile";
     }
 
-    #region Notification endpoints
-
+    /// <summary>
+    /// Notification endpoints
+    /// </summary>
     public static class Notification
     {
         // [GET]
@@ -46,5 +45,45 @@ public class APIRoute
         // [PATCH]
         // [DELETE]
     }
-    #endregion
+
+    /// <summary>
+    /// User endpoints
+    /// </summary>
+    public static class User
+    {
+        // [GET]
+        public const string GetById = Base + "/management/users/{id}";
+        public const string GetAll = Base + "/management/users";
+        public const string Export = Base + "/management/users/export";
+        // [POST]
+        public const string Create = Base + "/management/users";
+        public const string Import = Base + "/management/users/import";
+        // [PUT]
+        public const string Update = Base + "/management/users/{id}";
+        // [PATCH]
+        public const string ChangeAccountStatus = Base + "/management/users/{id}/status";
+        public const string SoftDelete = Base + "/management/users/{id}/soft-delete";
+        public const string SoftDeleteRange = Base + "/management/users/soft-delete-range";
+        public const string UndoDelete = Base + "/management/users/{id}/undo-delete";
+        public const string UndoDeleteRange = Base + "/management/users/undo-delete-range";
+        // [DELETE]
+        public const string HardDelete = Base + "/management/users/{id}";
+        public const string HardDeleteRange = Base + "/management/users";
+    }
+    
+    /// <summary>
+    /// Role endpoints
+    /// </summary>
+    public static class Role
+    {
+        //	[GET]
+        public const string GetAllRole = Base + "/management/roles";
+        public const string GetById = Base + "/management/roles/{id}";
+        //	[POST]
+        //	[PUT]
+        //	[PATCH]
+        public const string UpdateUserRole = Base + "/management/roles/users/{userId}";
+        //	[DELETE]
+        public const string DeleteRole = Base + "/management/roles/{id}";
+    }
 }

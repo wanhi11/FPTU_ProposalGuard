@@ -6,4 +6,5 @@ namespace FPTU_ProposalGuard.Domain.Interfaces.Services;
 public interface ISystemRoleService<TDto> : IGenericService<SystemRole, TDto, int>
     where TDto : class
 {
+    Task<IServiceResult> UpdateUserRoleAsync(Guid userId, int roleId);
 }
