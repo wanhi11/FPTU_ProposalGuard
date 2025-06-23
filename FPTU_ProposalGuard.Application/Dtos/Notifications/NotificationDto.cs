@@ -7,7 +7,7 @@ public class NotificationDto
 {
     public int NotificationId { get; set; }
 
-    public int? RecipientId { get; set; }
+    public Guid? RecipientId { get; set; }
 
     public string? Title { get; set; }
 
@@ -15,11 +15,13 @@ public class NotificationDto
 
     public NotificationType Type { get; set; }
 
-    public bool IsRead { get; set; }
-
+    public bool IsPublic { get; set; }
+    
     public DateTime CreateDate { get; set; }
 
     public Guid CreatedById { get; set; }
 
     public UserDto CreatedBy { get; set; } = null!;
+
+    public ICollection<NotificationRecipientDto> NotificationRecipients { get; set; } = new List<NotificationRecipientDto>();
 }

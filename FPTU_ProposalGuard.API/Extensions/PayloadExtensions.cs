@@ -17,10 +17,18 @@ public static class PayloadExtensions
     public static NotificationDto ToNotificationDto(this CreateNotificationRequest req)
         => new()
         {
-            RecipientId = req.RecipientId,
             Title = req.Title,
             Message = req.Message,
-            Type = req.Type
+            Type = req.NotificationType,
+            IsPublic = req.IsPublic
+        };
+    
+    public static NotificationDto ToNotificationDto(this UpdateNotificationRequest req)
+        => new()
+        {
+            Title = req.Title,
+            Message = req.Message,
+            Type = req.NotificationType
         };
     #endregion
     

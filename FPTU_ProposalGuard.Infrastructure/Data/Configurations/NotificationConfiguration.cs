@@ -16,9 +16,7 @@ public class NotificationConfiguration : IEntityTypeConfiguration<Notification>
         builder.Property(e => e.CreateDate)
             .HasColumnType("datetime")
             .HasColumnName("create_date");
-        builder.Property(e => e.RecipientId).HasColumnName("recipient_id");
-        builder.Property(e => e.CreatedById).HasColumnName("created_by_id");
-        builder.Property(e => e.IsRead).HasColumnName("is_read");
+        builder.Property(e => e.IsPublic).HasColumnName("is_public");
         builder.Property(e => e.Message).HasColumnName("message");
         builder.Property(e => e.Title)
             .HasMaxLength(255)
@@ -28,14 +26,10 @@ public class NotificationConfiguration : IEntityTypeConfiguration<Notification>
             .HasConversion<string>()
             .HasColumnName("type");
 
+        builder.Property(e => e.CreatedById).HasColumnName("created_by_id");
         builder.HasOne(d => d.CreatedBy).WithMany(p => p.NotificationCreations)
             .HasForeignKey(d => d.CreatedById)
             .OnDelete(DeleteBehavior.ClientSetNull)
             .HasConstraintName("FK_Notification_CreatedBy");
-        
-        builder.HasOne(d => d.Recipient).WithMany(p => p.NotificationRecipients)
-            .HasForeignKey(d => d.RecipientId)
-            .OnDelete(DeleteBehavior.ClientSetNull)
-            .HasConstraintName("FK_Notification_Recipient");
     }
 }

@@ -30,6 +30,7 @@ public class FptuProposalGuardDbContext : DbContext
     }
 
     public DbSet<Notification> Notifications { get; set; }
+    public DbSet<NotificationRecipient> NotificationRecipients { get; set; }
 
     public DbSet<ProjectProposal> ProjectProposals { get; set; }
 
