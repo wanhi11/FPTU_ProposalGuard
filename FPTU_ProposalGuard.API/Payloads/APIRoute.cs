@@ -37,13 +37,28 @@ public class APIRoute
     /// </summary>
     public static class Notification
     {
-        // [GET]
-        public const string GetAll = Base + "/notifications";
-        // [POST]
-        public const string Create = Base + "/notifications";
-        // [PUT]
-        // [PATCH]
-        // [DELETE]
+        #region Management
+        //	[GET]	
+        public const string GetAll = Base + "/management/notifications";
+        public const string GetById = Base + "/management/notifications/{id}";
+        //	[POST]
+        public const string Create = Base + "/management/notifications";
+        //	[PUT]
+        public const string Update = Base + "/management/notifications/{id}";
+        //	[PATCH]
+        //	[DELETE]
+        #endregion
+			
+        //	[GET]
+        public const string GetPrivacyById = Base + "/privacy/notifications/{id}";
+        //	[POST]
+        public const string GetAllPrivacy = Base + "/privacy/notifications";
+        public const string GetNumberOfUnreadNotifications = Base + "/privacy/unread-noti"; 
+        //	[PUT]
+        public const string UpdateReadStatus = Base + "/privacy/notifications";
+        public const string MarkAsReadAll = Base + "/privacy/notifications/mark-as-read-all";
+        //	[PATCH]
+        //	[DELETE]
     }
 
     /// <summary>

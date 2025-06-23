@@ -49,7 +49,8 @@ public class User
     public int RoleId { get; set; }
 
     public ICollection<Notification> NotificationCreations { get; set; } = new List<Notification>();
-    public ICollection<Notification> NotificationRecipients { get; set; } = new List<Notification>();
+    
+    public ICollection<NotificationRecipient> NotificationRecipients { get; set; } = new List<NotificationRecipient>();
 
     public ICollection<ProjectProposal> ProjectProposalApprovers { get; set; } = new List<ProjectProposal>();
 

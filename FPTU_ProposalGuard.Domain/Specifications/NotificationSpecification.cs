@@ -9,54 +9,86 @@ public class NotificationSpecification : BaseSpecification<Notification>
 {
     public int PageIndex { get; set; }
     public int PageSize { get; set; }
+    public string? Email { get; set; }
+    public bool IsCallFromManagement { get; set; }
 
-    public NotificationSpecification(NotificationSpecParams specParams, int pageIndex, int pageSize)
+    public NotificationSpecification(NotificationSpecParams specParams, int pageIndex, int pageSize,
+        bool isCallFromManagement = false) 
         : base(n =>
-            // search with term
-            string.IsNullOrEmpty(specParams.Search) ||
-            (
-                // Title
-                (!string.IsNullOrEmpty(n.Title) && n.Title.Contains(specParams.Search)) ||
-                // Message
-                (!string.IsNullOrEmpty(n.Message) && n.Message.Contains(specParams.Search))
+        string.IsNullOrEmpty(specParams.Search) ||
+        (
+            (!string.IsNullOrEmpty(n.Title) && n.Title.Contains(specParams.Search)) ||
+            (!string.IsNullOrEmpty(n.Message) && n.Message.Contains(specParams.Search)) ||
+            
+            // Notification recipient info
+            n.NotificationRecipients.Any(nr => 
+                !string.IsNullOrEmpty(nr.Recipient.Email) && nr.Recipient.Email.Contains(specParams.Search) ||
+                !string.IsNullOrEmpty(nr.Recipient.FirstName) && nr.Recipient.FirstName.Contains(specParams.Search) ||
+                !string.IsNullOrEmpty(nr.Recipient.LastName) && nr.Recipient.LastName.Contains(specParams.Search)
             )
-        )
+        ))
     {
-        // Assign page size and page index
+        // Assign email
+        Email = specParams.Email;
+        
+        // Assign bool
+        IsCallFromManagement = isCallFromManagement;
+        
+        // Pagination
         PageIndex = pageIndex;
         PageSize = pageSize;
-        
+
         // Enable split query
         EnableSplitQuery();
-        
-        // Apply include
-        ApplyInclude(q => q
-            .Include(n => n.CreatedBy)
-            .Include(n => n.Recipient)
-        );
-        
-        // Progress filter
-        if (specParams.RecipientId != null && specParams.RecipientId != Guid.Empty)
+
+        // Filter for specific usage (privacy or management)
+        if (!string.IsNullOrEmpty(specParams.Email))
         {
-            AddFilter(n => n.RecipientId == specParams.RecipientId);
+            // Check whether is call from management
+            if (!isCallFromManagement) // Used by user
+            {
+                AddFilter(s => 
+                    s.IsPublic == true || // All with public  
+                    (
+                        // Combined with privacy of their email
+                        s.IsPublic == false && s.NotificationRecipients.Any(r => r.Recipient.Email == specParams.Email)
+                    )
+                );
+                
+                // Check whether filtering private field
+                if(specParams.isPublic !=  null) AddFilter(s => s.IsPublic == specParams.isPublic);
+            }
+            else if (isCallFromManagement) // Called by employee
+            {
+                // Only process get all user's privacy notification
+                AddFilter(s => s.IsPublic == false && s.NotificationRecipients.Any(r => r.Recipient.Email == specParams.Email));
+            }
         }
-        if (specParams.IsRead != null)
+        else if (string.IsNullOrEmpty(specParams.Email) && isCallFromManagement)
         {
-            AddFilter(n => n.IsRead == specParams.IsRead);
+            // Filter default as public only
+            AddFilter(s => s.IsPublic == true);
         }
-        if (specParams.Type != null)
+
+        if (specParams.CreatedBy != null) // Created by
         {
-            AddFilter(n => n.Type == specParams.Type);
-        }        
+            AddFilter(x => x.CreatedBy.Email == specParams.CreatedBy);
+        }
+        if (specParams.NotificationType != null) // Notification type
+        {
+            AddFilter(x => x.Type == specParams.NotificationType);
+        }
+        
         if (specParams.CreateDateRange != null
-            && specParams.CreateDateRange.Length > 1) // With range of dob
+            && specParams.CreateDateRange.Length > 1) // With range of create date 
         {
             if (specParams.CreateDateRange[0].HasValue && specParams.CreateDateRange[1].HasValue)
             {
-                AddFilter(x => x.CreateDate.Date >= specParams.CreateDateRange[0]!.Value.Date &&
-                               x.CreateDate.Date <= specParams.CreateDateRange[1]!.Value.Date);
+                AddFilter(x =>
+                    x.CreateDate >= specParams.CreateDateRange[0]!.Value.Date
+                    && x.CreateDate <= specParams.CreateDateRange[1]!.Value.Date);
             }
-            else if ((specParams.CreateDateRange[0] is null && specParams.CreateDateRange[1].HasValue))
+            else if (specParams.CreateDateRange[0] is null && specParams.CreateDateRange[1].HasValue)
             {
                 AddFilter(x => x.CreateDate <= specParams.CreateDateRange[1]);
             }
@@ -65,39 +97,28 @@ public class NotificationSpecification : BaseSpecification<Notification>
                 AddFilter(x => x.CreateDate >= specParams.CreateDateRange[0]);
             }
         }
-        
-        // Progress sorting
+
         if (!string.IsNullOrEmpty(specParams.Sort))
         {
-            // Check is descending sorting 
-            var isDescending = specParams.Sort.StartsWith("-");
-            if (isDescending)
-            {
-                specParams.Sort = specParams.Sort.Trim('-');
-            }
-            
-            // Uppercase sort value
-            specParams.Sort = specParams.Sort.ToUpper();
+            var sortBy = specParams.Sort.Trim();
+            var isDescending = sortBy.StartsWith("-");
+            var propertyName = isDescending ? sortBy.Substring(1) : sortBy;
 
-            // Apply sorting
-            ApplySorting(specParams.Sort, isDescending);
+            ApplySorting(propertyName, isDescending);
         }
         else
         {
-            // Default order by create date
-            AddOrderByDescending(u => u.CreateDate);
+            AddOrderByDescending(n => n.CreateDate);
         }
     }
-    
+
     private void ApplySorting(string propertyName, bool isDescending)
     {
         if (string.IsNullOrEmpty(propertyName)) return;
 
-        // Initialize expression parameter with type of Employee (x)
+        // Use Reflection to dynamically apply sorting
         var parameter = Expression.Parameter(typeof(Notification), "x");
-        // Assign property base on property name (x.PropertyName)
         var property = Expression.Property(parameter, propertyName);
-        // Building a complete sort lambda expression (x => x.PropertyName)
         var sortExpression =
             Expression.Lambda<Func<Notification, object>>(Expression.Convert(property, typeof(object)), parameter);
 

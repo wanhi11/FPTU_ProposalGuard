@@ -16,6 +16,7 @@ using FPTU_ProposalGuard.Domain.Interfaces.Repositories;
 using FPTU_ProposalGuard.Domain.Interfaces.Services;
 using FPTU_ProposalGuard.Domain.Interfaces.Services.Base;
 using FPTU_ProposalGuard.Domain.Specifications;
+using FPTU_ProposalGuard.Domain.Specifications.Interfaces;
 using Google.Apis.Auth;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Auth.OAuth2.Requests;
@@ -126,7 +127,85 @@ public class UserService : GenericService<User, UserDto, Guid>, IUserService<Use
 		    throw new Exception("Error invoke when process create user");
 	    }
     }
+	public override async Task<IServiceResult> UpdateAsync(Guid id, UserDto dto)
+	{
+		// Initiate service result
+		var serviceResult = new ServiceResult();
 
+		try
+		{
+			// Validate inputs using the generic validator
+			var validationResult = await ValidatorExtensions.ValidateAsync(dto);
+			// Check for valid validations
+			if (validationResult != null && !validationResult.IsValid)
+			{
+				// Convert ValidationResult to ValidationProblemsDetails.Errors
+				var errors = validationResult.ToProblemDetails().Errors;
+				throw new UnprocessableEntityException("Invalid validations", errors);
+			}
+
+			// Retrieve the entity
+			var existingEntity = await _unitOfWork.Repository<User, Guid>().GetByIdAsync(id);
+			if (existingEntity == null)
+			{
+				var errMsg = await _msgService.GetMessageAsync(ResultCodeConst.SYS_Warning0002);
+				return new ServiceResult(ResultCodeConst.SYS_Warning0002,
+					StringUtils.Format(errMsg, typeof(User).ToString().ToLower()));
+			}
+
+			// Current local datetime
+			var currentLocalDateTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,
+				// Vietnam timezone
+				TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"));
+
+			// Update properties
+			existingEntity.FirstName = dto.FirstName ?? string.Empty;
+			existingEntity.LastName = dto.LastName ?? string.Empty;
+			existingEntity.Dob = dto.Dob;
+			existingEntity.Phone = dto.Phone;
+			existingEntity.Address = dto.Address;
+			existingEntity.Gender = dto.Gender;
+			existingEntity.ModifiedDate = currentLocalDateTime;
+
+			// Check if there are any differences between the original and the updated entity
+			if (!_unitOfWork.Repository<User, Guid>().HasChanges(existingEntity))
+			{
+				serviceResult.ResultCode = ResultCodeConst.SYS_Success0003;
+				serviceResult.Message = await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0003);
+				serviceResult.Data = true;
+				return serviceResult;
+			}
+
+			// Progress update when all require passed
+			await _unitOfWork.Repository<User, Guid>().UpdateAsync(existingEntity);
+
+			// Save changes to DB
+			var rowsAffected = await _unitOfWork.SaveChangesAsync();
+			if (rowsAffected == 0)
+			{
+				serviceResult.ResultCode = ResultCodeConst.SYS_Fail0003;
+				serviceResult.Message = await _msgService.GetMessageAsync(ResultCodeConst.SYS_Fail0003);
+				serviceResult.Data = false;
+			}
+
+			// Mark as update success
+			serviceResult.ResultCode = ResultCodeConst.SYS_Success0003;
+			serviceResult.Message = await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0003);
+			serviceResult.Data = true;
+		}
+		catch (UnprocessableEntityException)
+		{
+			throw;
+		}
+		catch (Exception ex)
+		{
+			_logger.Error(ex.Message);
+			throw new Exception("Error invoke when process update user");
+		}
+
+		return serviceResult;
+	}
+    
     public override async Task<IServiceResult> GetByIdAsync(Guid id)
     {
 	    // Build spec
@@ -162,6 +241,77 @@ public class UserService : GenericService<User, UserDto, Guid>, IUserService<Use
 		    await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0002),
 		    existedUser.Adapt<UserDto>(localConfig));
     }
+    
+    public override async Task<IServiceResult> GetAllWithSpecAsync(ISpecification<User> spec, bool tracked = true)
+	{
+		try
+		{
+			// Try to parse specification to UserSpecification
+			var userSpec = spec as UserSpecification;
+			// Check if specification is null
+			if (userSpec == null)
+			{
+				return new ServiceResult(ResultCodeConst.SYS_Fail0002,
+					await _msgService.GetMessageAsync(ResultCodeConst.SYS_Fail0002));
+			}
+
+			// Define a local Mapster configuration
+			var localConfig = new TypeAdapterConfig();
+			localConfig.NewConfig<User, UserDto>()
+				.Ignore(dest => dest.PasswordHash!)
+				.Ignore(dest => dest.EmailConfirmed)
+				.Ignore(dest => dest.TwoFactorEnabled)
+				.Ignore(dest => dest.PhoneNumberConfirmed)
+				.Ignore(dest => dest.TwoFactorSecretKey!)
+				.Ignore(dest => dest.TwoFactorBackupCodes!)
+				.Ignore(dest => dest.PhoneVerificationCode!)
+				.Ignore(dest => dest.EmailVerificationCode!)
+				.Ignore(dest => dest.PhoneVerificationExpiry!);
+
+			// Count total users
+			var totalUserWithSpec = await _unitOfWork.Repository<User, Guid>().CountAsync(userSpec);
+			// Count total page
+			var totalPage = (int)Math.Ceiling((double)totalUserWithSpec / userSpec.PageSize);
+
+			// Set pagination to specification after count total users 
+			if (userSpec.PageIndex > totalPage
+			    || userSpec.PageIndex < 1) // Exceed total page or page index smaller than 1
+			{
+				userSpec.PageIndex = 1; // Set default to first page
+			}
+
+			// Apply pagination
+			userSpec.ApplyPaging(
+				skip: userSpec.PageSize * (userSpec.PageIndex - 1),
+				take: userSpec.PageSize);
+
+			var entities = await _unitOfWork.Repository<User, Guid>().GetAllWithSpecAsync(spec, tracked);
+			if (entities.Any())
+			{
+				// Convert to dto collection 
+				var userDtos = entities.Adapt<IEnumerable<UserDto>>(localConfig);
+
+				// Pagination result 
+				var paginationResultDto = new PaginatedResultDto<UserDto>(userDtos,
+					userSpec.PageIndex, userSpec.PageSize, totalPage, totalUserWithSpec);
+
+				// Response with pagination 
+				return new ServiceResult(ResultCodeConst.SYS_Success0002,
+					await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0002), paginationResultDto);
+			}
+
+			// Not found any data
+			return new ServiceResult(ResultCodeConst.SYS_Warning0004,
+				await _msgService.GetMessageAsync(ResultCodeConst.SYS_Warning0004),
+				// Mapping entities to dto and ignore sensitive user data
+				entities.Adapt<IEnumerable<UserDto>>(localConfig));
+		}
+		catch (Exception ex)
+		{
+			_logger.Error(ex.Message);
+			throw new Exception("Error invoke when progress get all data");
+		}
+	}
     
     public async Task<IServiceResult> GetCurrentUserAsync(string email)
 	{

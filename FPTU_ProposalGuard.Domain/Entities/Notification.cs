@@ -14,12 +14,13 @@ public class Notification
 
     public NotificationType Type { get; set; }
 
-    public bool IsRead { get; set; }
-
+    public bool IsPublic { get; set; }
+    
     public DateTime CreateDate { get; set; }
 
     public Guid CreatedById { get; set; }
 
-    public User Recipient { get; set; } = null!;
     public User CreatedBy { get; set; } = null!;
+
+    public ICollection<NotificationRecipient> NotificationRecipients { get; set; } = new List<NotificationRecipient>();
 }

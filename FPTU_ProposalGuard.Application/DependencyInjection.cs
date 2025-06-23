@@ -27,6 +27,7 @@ public static class DependencyInjection
         services.AddScoped(typeof(IGenericService<,,>), typeof(GenericService<,,>));
         services.AddScoped(typeof(IReadOnlyService<,,>), typeof(ReadOnlyService<,,>));
         services.AddScoped<INotificationService<NotificationDto>, NotificationService>();
+        services.AddScoped<INotificationRecipientService<NotificationRecipientDto>, NotificationRecipientService>();
         services.AddScoped<IRefreshTokenService<RefreshTokenDto>, RefreshTokenService>();
         services.AddScoped<IUserService<UserDto>, UserService>();
         services.AddScoped<ISystemRoleService<SystemRoleDto>, SystemRoleService>();

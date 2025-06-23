@@ -4,8 +4,9 @@ namespace FPTU_ProposalGuard.Domain.Specifications.Params;
 
 public class NotificationSpecParams : BaseSpecParams
 {
-    public Guid? RecipientId { get; set; }
-    public bool? IsRead { get; set; }
-    public NotificationType? Type { get; set; }
-    public DateTime?[]? CreateDateRange { get; set; }
+    public string? Email { get; set; }
+    public string? CreatedBy { get; set; } = null!;
+    public bool? isPublic { get; set; }
+    public NotificationType? NotificationType { get; set; }
+    public DateTime?[]? CreateDateRange { get; set; } 
 }
