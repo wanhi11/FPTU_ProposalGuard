@@ -58,6 +58,7 @@ public class DatabaseInitializer(FptuProposalGuardDbContext context, ILogger log
         try
         {
             if (!await context.Users.AnyAsync()) await SeedUserRoleAsync();
+            if(!await context.Semesters.AnyAsync()) await SeedSemesterAsync();
         }
         catch (Exception ex)
         {
@@ -130,8 +131,33 @@ public class DatabaseInitializer(FptuProposalGuardDbContext context, ILogger log
         isSaved = await context.SaveChangesAsync() > 0;
         if(isSaved) logger.Information($"[USER] Seed {users} data successfully");
     }
+    private async Task SeedSemesterAsync()
+    {
+        List<Semester> semesters = new()
+        {
+            new()
+            {
+                SemesterId = 1,
+                Term = Term.Spring,
+                Year = 2025,
+                SemesterCode = "SP25"
+            },
+            new()
+            {
+                SemesterId = 2,
+                Term = Term.Summer,
+                Year = 2025,
+                SemesterCode = "SU25"
+            }
+        };
+    
+        // Add range
+        await context.AddRangeAsync(semesters);
+        // Save change
+        var isSaved = await context.SaveChangesAsync() > 0;
+        if(isSaved) logger.Information($"[SEMESTER] Seed {semesters} data successfully");
+    }
 }
-
 public static class DatabaseInitializerExtensions
 {
     public static string GetDescription(this System.Enum value)

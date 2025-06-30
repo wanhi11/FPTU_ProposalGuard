@@ -1,9 +1,9 @@
-﻿using FPTU_ProposalGuard.Domain.Common.Enums;
-using FPTU_ProposalGuard.Domain.Interfaces;
+using FPTU_ProposalGuard.Application.Dtos.Users;
+using FPTU_ProposalGuard.Domain.Common.Enums;
 
-namespace FPTU_ProposalGuard.Domain.Entities;
+namespace FPTU_ProposalGuard.Application.Dtos.Proposals;
 
-public class ProjectProposal : IAuditableEntity
+public class ProjectProposalDto
 {
     public int ProjectProposalId { get; set; }
 
@@ -49,19 +49,7 @@ public class ProjectProposal : IAuditableEntity
 
     public string? UpdatedBy { get; set; }
 
-    public User? Approver { get; set; }
+    public UserDto? Approver { get; set; }
 
-    public ICollection<ProposalHistory> ProposalHistories { get; set; } = new List<ProposalHistory>();
-
-    public ICollection<ProposalSimilarity> ProposalSimilarityCheckedProposals { get; set; } = new List<ProposalSimilarity>();
-
-    public ICollection<ProposalSimilarity> ProposalSimilarityExistingProposals { get; set; } = new List<ProposalSimilarity>();
-
-    public ProposalStudent? ProposalStudent { get; set; }
-
-    public ProposalSupervisor? ProposalSupervisor { get; set; }
-
-    public Semester Semester { get; set; } = null!;
-
-    public User Submitter { get; set; } = null!;
+    public UserDto Submitter { get; set; } = null!;
 }

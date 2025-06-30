@@ -101,4 +101,17 @@ public class APIRoute
         //	[DELETE]
         public const string DeleteRole = Base + "/management/roles/{id}";
     }
+
+    /// <summary>
+    /// Proposal endpoints
+    /// </summary>
+    public static class Proposal
+    {
+        //[GET]
+        //[POST]
+        public const string CheckDuplicatedProposal = Base + "/proposal/check-duplicate";
+        public const string UploadEmbeddedWithFile = Base + "proposal/upload-embedded/v1";
+        public const string UploadEmbeddedWithoutFile = Base + "proposal/upload-embedded/v2";
+        
+    }
 }
