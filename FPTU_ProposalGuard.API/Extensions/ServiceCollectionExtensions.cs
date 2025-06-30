@@ -59,7 +59,8 @@ namespace FPTU_ProposalGuard.API.Extensions
             services.Configure<WebTokenSettings>(builder.Configuration.GetSection("WebTokenSettings"));
             // Configure GoogleAuthSettings
             services.Configure<GoogleAuthSettings>(builder.Configuration.GetSection("GoogleAuthSettings"));
-
+            // Configure CheckProposalSettings
+            services.Configure<CheckProposalSettings>(builder.Configuration.GetSection("CheckProposalSettings"));
             return services;
         }
 

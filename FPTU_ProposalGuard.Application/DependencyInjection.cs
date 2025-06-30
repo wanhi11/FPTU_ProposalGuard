@@ -2,6 +2,7 @@
 using FPTU_ProposalGuard.Application.Dtos;
 using FPTU_ProposalGuard.Application.Dtos.Authentications;
 using FPTU_ProposalGuard.Application.Dtos.Notifications;
+using FPTU_ProposalGuard.Application.Dtos.Proposals;
 using FPTU_ProposalGuard.Application.Dtos.SystemRoles;
 using FPTU_ProposalGuard.Application.Dtos.Users;
 using FPTU_ProposalGuard.Application.Services;
@@ -31,7 +32,10 @@ public static class DependencyInjection
         services.AddScoped<IRefreshTokenService<RefreshTokenDto>, RefreshTokenService>();
         services.AddScoped<IUserService<UserDto>, UserService>();
         services.AddScoped<ISystemRoleService<SystemRoleDto>, SystemRoleService>();
-
+        services.AddScoped<IProposalService, ProposalService>();
+        services.AddScoped<IProjectProposalService<ProjectProposalDto>, ProjectProposalService>();
+        services.AddScoped<IEmbeddingService,EmbeddingService>();
+        
         return services
             .ConfigureMapster() // Add mapster
             .ConfigureCloudinary() // Add cloudinary

@@ -265,4 +265,24 @@ public class ResultCodeConst
     /// </summary>
     public static string Notification_Fail0001 = "Notification.Fail0001";
     #endregion
+
+    #region Proposal
+	
+    /// <summary>
+    /// [SUCCESS] Get Data in file successfully
+    /// </summary>
+    public static string Proposal_Success0001 = "Proposal.Success0001";
+    /// <summary>
+    /// [SUCCESS] Upload data to OpenSearch successfully
+    /// </summary>
+    public static string Proposal_Success0002 = "Proposal.Success0002";
+    /// <summary>
+    /// [WARNING] Something went wrong while processing the file
+    /// </summary>
+    public static string Proposal_Warning0001 = "Proposal.Warning0001";
+    /// <summary>
+    /// [WARNING] OpenSearch Bulk Error
+    /// </summary>
+    public static string Proposal_Warning0002 = "Proposal.Warning0002";
+    #endregion
 }
