@@ -10,31 +10,29 @@ using Serilog;
 
 namespace FPTU_ProposalGuard.Application.Services;
 
-public class ProjectProposalService:GenericService<ProjectProposal, ProjectProposalDto, int>,
-    IProjectProposalService<ProjectProposalDto>
+public class ProjectProposalService(
+    ISystemMessageService msgService,
+    IUnitOfWork unitOfWork,
+    IMapper mapper,
+    ILogger logger)
+    : GenericService<ProjectProposal, ProjectProposalDto, int>(msgService, unitOfWork, mapper, logger),
+        IProjectProposalService<ProjectProposalDto>
 {
-    public ProjectProposalService(ISystemMessageService msgService,
-        IUnitOfWork unitOfWork,
-        IMapper mapper,
-        ILogger logger): base(msgService, unitOfWork, mapper, logger)
-    {
-    }
-    
     public async Task<IServiceResult> CreateManyAsync(List<ProjectProposalDto> dtos)
     {
-        if (dtos == null || !dtos.Any())
+        if (dtos.Count == 0)
         {
             return new ServiceResult(ResultCodeConst.SYS_Fail0001,
                 await _msgService.GetMessageAsync(ResultCodeConst.SYS_Fail0001));
         }
 
         var entities = _mapper.Map<List<ProjectProposal>>(dtos);
-        await _unitOfWork.Repository<ProjectProposal,int>().AddRangeAsync(entities);
+        await _unitOfWork.Repository<ProjectProposal, int>().AddRangeAsync(entities);
         await _unitOfWork.SaveChangesAsync();
-        
+
         var returnDtos = _mapper.Map<List<ProjectProposalDto>>(entities);
-        
+
         return new ServiceResult(ResultCodeConst.SYS_Success0001,
-            await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0001),returnDtos);
+            await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0001), returnDtos);
     }
 }

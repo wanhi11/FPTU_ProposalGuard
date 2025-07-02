@@ -1,59 +1,31 @@
-using FPTU_ProposalGuard.Application.Services;
-
 namespace FPTU_ProposalGuard.Application.Dtos.Proposals;
 
-public class HandledProposalDto
-{
-    public string ProposalName { get; set; }
-    public List<FieldPoint> Details { get; set; }
-}
-
-public class FieldPoint
-{
-    public string FieldName { get; set; }
-    public double SimilarityPoint { get; set; }
-    public string SimilarParagraph { get; set; }
-}
-
-// Class to map after extracting files
-public class ExtractedProposal
-{
-    public ProposalContent Json { get; set; }
-    public string Text { get; set; }
-}
-
-public class ProposalContent
-{
-    public string? Name { get; set; }
-    public string? Context { get; set; }
-    public string? Solution { get; set; }
-}
-public class ProposalWithText
-{
-    public ProjectProposalDto Proposal { get; set; }
-    public string Text { get; set; }
-}
 public class ProposalAnalysisResult
 {
-    public string Name { get; set; }
-    public string Context { get; set; }
-    public string Solution { get; set; }
-    public string Text { get; set; }
-    public List<MatchReport> MatchedTopics { get; set; }
+    public string FileName { get; set; } = null!;
+    public string Name { get; set; } = null!;
+    public string Context { get; set; } = null!;
+    public string Solution { get; set; } = null!;
+    public string Text { get; set; } = null!;
+    public List<MatchReport> MatchedProposals { get; set; } = [];
 }
 
-public record TopicMatch(
-    int TopicId,
+public record ProposalMatch(
+    int ProposalId,
+    string Name,
     int ChunkId,
     string Text,
-    List<double> VectorEmbedding,
     double Score,
-    int? OriginChunkId);
+    double Similarity,
+    int? OriginChunkId,
+    string? UploadedChunkText
+);
 
 public record MatchReport(
-    int TopicId,
+    int ProposalId,
+    string Name,
     int MatchCount,
     int LongestContiguous,
     double MatchRatio,
     double AvgSimilarity,
-    List<TopicMatch> Matches);
+    List<ProposalMatch> Matches);
