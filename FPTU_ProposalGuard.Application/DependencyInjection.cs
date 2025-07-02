@@ -34,7 +34,7 @@ public static class DependencyInjection
         services.AddScoped<ISystemRoleService<SystemRoleDto>, SystemRoleService>();
         services.AddScoped<IProposalService, ProposalService>();
         services.AddScoped<IProjectProposalService<ProjectProposalDto>, ProjectProposalService>();
-        services.AddScoped<IEmbeddingService,EmbeddingService>();
+        services.AddScoped<IExtractService,ExtractService>();
         
         return services
             .ConfigureMapster() // Add mapster

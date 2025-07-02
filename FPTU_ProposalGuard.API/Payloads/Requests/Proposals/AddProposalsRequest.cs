@@ -1,6 +1,6 @@
-namespace FPTU_ProposalGuard.API.Payloads.Requests.Proposal;
+namespace FPTU_ProposalGuard.API.Payloads.Requests.Proposals;
 
-public class UploadEmbeddedWithoutFileRequest
+public class AddProposalsRequest
 {
     public List<InputDetail> Proposal { get; set; } = new List<InputDetail>();
     public int SemesterId { get; set; }
@@ -15,7 +15,7 @@ public class InputDetail
 }
 public static class UploadEmbeddedWithoutFileRequestExtension
 {
-    public static List<(string Name, string Context, string Solution, string Text)> ToTupleList(this UploadEmbeddedWithoutFileRequest request)
+    public static List<(string Name, string Context, string Solution, string Text)> ToTupleList(this AddProposalsRequest request)
     {
         return request.Proposal.Select(p => (p.Name, p.Context, p.Solution, p.Text)).ToList();
     }

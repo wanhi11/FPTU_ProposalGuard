@@ -1,11 +1,8 @@
-using System.Net.Http.Headers;
 using System.Text;
 using FPTU_ProposalGuard.Application.Common;
 using FPTU_ProposalGuard.Application.Configurations;
-using FPTU_ProposalGuard.Domain.Interfaces;
 using FPTU_ProposalGuard.Domain.Interfaces.Services;
 using FPTU_ProposalGuard.Domain.Interfaces.Services.Base;
-using MapsterMapper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
@@ -13,62 +10,47 @@ using FPTU_ProposalGuard.Application.Dtos.Proposals;
 using FPTU_ProposalGuard.Application.Dtos.Users;
 using FPTU_ProposalGuard.Application.Services.IExternalServices;
 using FPTU_ProposalGuard.Domain.Common.Enums;
-using FPTU_ProposalGuard.Domain.Entities;
 using OpenSearch.Net;
 using Serilog;
-using HttpMethod = System.Net.Http.HttpMethod;
 using ProjectProposalDto = FPTU_ProposalGuard.Application.Dtos.Proposals.ProjectProposalDto;
 
 namespace FPTU_ProposalGuard.Application.Services;
 
 public class ProposalService : IProposalService
 {
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IMapper _mapper;
     private readonly ILogger _logger;
-    private readonly HttpClient _httpClient;
+    private readonly CheckProposalSettings _appSettings;
     private readonly ISystemMessageService _msgService;
-    private readonly IEmbeddingService _embeddingService;
+    private readonly IExtractService _extractService;
     private readonly IProjectProposalService<ProjectProposalDto> _projectService;
     private readonly IUserService<UserDto> _userService;
-    private readonly CheckProposalSettings _appSettings;
+    private readonly OpenSearchLowLevelClient _openSearchClient;
 
-    private readonly Lazy<OpenSearchLowLevelClient> _instance = new(() =>
-    {
-        var node = new Uri("https://localhost:9200");
-
-        var config = new ConnectionConfiguration(node)
-            .BasicAuthentication("admin", "SamplePassword1!")
-            .ServerCertificateValidationCallback(CertificateValidations.AllowAll); // nếu cần bỏ qua SSL cert
-
-        return new OpenSearchLowLevelClient(config);
-    });
-
-    private readonly string _getUrl =
-        "https://jcue5xstullxa7twdywakms43i0nsmgc.lambda-url.ap-southeast-1.on.aws/api/topics/analyze";
-
-    public ProposalService(IUnitOfWork unitOfWork,
-        IMapper mapper,
+    public ProposalService(
         ILogger logger,
         IOptionsMonitor<CheckProposalSettings> appSettings,
-        HttpClient httpClient,
         ISystemMessageService msgService,
-        IEmbeddingService embeddingService,
+        IExtractService extractService,
         IProjectProposalService<ProjectProposalDto> projectService,
         IUserService<UserDto> userService)
     {
-        _unitOfWork = unitOfWork;
-        _mapper = mapper;
         _logger = logger;
-        _httpClient = httpClient;
+        _appSettings = appSettings.CurrentValue;
         _msgService = msgService;
-        _embeddingService = embeddingService;
+        _extractService = extractService;
         _projectService = projectService;
         _userService = userService;
-        _appSettings = appSettings.CurrentValue;
+
+        var node = new Uri(_appSettings.OpenSearchUrl);
+
+        var config = new ConnectionConfiguration(node)
+            .BasicAuthentication(_appSettings.OpenSearchUsername, _appSettings.OpenSearchPassword)
+            .ServerCertificateValidationCallback(CertificateValidations.AllowAll); // nếu cần bỏ qua SSL cert
+
+        _openSearchClient = new OpenSearchLowLevelClient(config);
     }
 
-    public async Task<IServiceResult> UploadDataToOpenSearch(List<IFormFile> files, int semesterId, string email)
+    public async Task<IServiceResult> AddProposalsWithFiles(List<IFormFile> files, int semesterId, string email)
     {
         try
         {
@@ -78,301 +60,162 @@ public class ProposalService : IProposalService
                 return userResponse;
             }
 
-            var requestContent = new MultipartFormDataContent();
-            foreach (var file in files)
-            {
-                var stream = file.OpenReadStream();
-                var fileContent = new StreamContent(stream);
-                fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
-                requestContent.Add(fileContent, "topics", file.FileName);
-            }
+            var extractedDocuments = await _extractService.ExtractDocuments(files);
 
-            var request = new HttpRequestMessage(HttpMethod.Post, _getUrl)
-            {
-                Content = requestContent
-            };
+            var user = (userResponse.Data as UserDto)!;
 
-            request.Headers.Add("X-API-Key", _appSettings.FilterDataKey);
-
-            var response = await _httpClient.SendAsync(request);
-
-            var resultContent = await response.Content.ReadAsStringAsync();
-
-            if (!response.IsSuccessStatusCode)
-            {
-                return new ServiceResult(ResultCodeConst.Proposal_Warning0001,
-                    await _msgService.GetMessageAsync(ResultCodeConst.Proposal_Warning0001));
-            }
-
-            var user = userResponse.Data as UserDto;
-            // Map to proposal
-            var proposalsWithTexts = MapToProposal(resultContent, semesterId, user!.UserId);
-
-            var proposals = proposalsWithTexts
-                .Select(x => x.Proposal).ToList();
-
-            var createdProposal = await _projectService.CreateManyAsync(proposals);
-
-            if (createdProposal.ResultCode != ResultCodeConst.SYS_Success0001)
-            {
-                return createdProposal;
-            }
-
-            var createdProposals = createdProposal.Data as List<ProjectProposalDto>;
-
-            // Upload embedding to OpenSearch
-            // Convert to vector
-            var proposalWithTextFinal = createdProposals!.Zip(
-                proposalsWithTexts,
-                (created, original) => new
-                {
-                    Proposal = created,
-                    Text = original.Text
-                }
-            ).ToList();
-
-            var bulkPayload = new StringBuilder();
-            foreach (var item in proposalWithTextFinal)
-            {
-                var chunks = await _embeddingService.Embedding(item.Text);
-                foreach (var chunk in chunks)
-                {
-                    var indexMeta = new
-                    {
-                        index = new
-                        {
-                            _index = "topics",
-                            _id = $"{item.Proposal.ProjectProposalId}_{chunk.ChunkId}"
-                        }
-                    };
-
-                    var doc = new
-                    {
-                        topic_id = item.Proposal.ProjectProposalId,
-                        chunk_id = chunk.ChunkId,
-                        text = chunk.Text,
-                        vector_embedding = chunk.Vector
-                    };
-
-                    bulkPayload.AppendLine(JsonSerializer.Serialize(indexMeta));
-                    bulkPayload.AppendLine(JsonSerializer.Serialize(doc));
-                }
-            }
-
-            // send request to OpenSearch
-            var responseOpenSearch = await _instance.Value.BulkAsync<StringResponse>(
-                PostData.String(bulkPayload.ToString()),
-                new BulkRequestParameters
-                {
-                    Refresh = Refresh.True
-                }
-            );
-            // check for error
-            if (responseOpenSearch.HttpStatusCode is null or >= 400 ||
-                responseOpenSearch.Body.Contains("\"errors\":true"))
-            {
-                return new ServiceResult(ResultCodeConst.Proposal_Warning0002,
-                    await _msgService.GetMessageAsync(ResultCodeConst.Proposal_Warning0002));
-            }
-
-            return new ServiceResult(ResultCodeConst.Proposal_Success0002,
-                await _msgService.GetMessageAsync(ResultCodeConst.Proposal_Success0002));
-        }
-        catch (Exception ex)
-        {
-            _logger.Error(ex.Message);
-            throw new Exception("Error invoke when progress upload data with file");
-        }
-    }
-
-    public async Task<IServiceResult> UploadDataToOpenSearch(List<(string Name, string Context, string Solution, string Text)> contexts, int semesterId, string email)
-    {
-        try
-        {
-            var userResponse = await _userService.GetCurrentUserAsync(email);
-            if (userResponse.ResultCode != ResultCodeConst.SYS_Success0002)
-            {
-                return userResponse;
-            }
-            
-            var user = userResponse.Data as UserDto;
-            // Map to proposal
-            var proposals = new List<ProjectProposalDto>();
-            foreach (var valueTuple in contexts)
-            {
-                proposals.Add(new ProjectProposalDto()
+            var proposalDtos = extractedDocuments
+                .Select(x => new ProjectProposalDto
                 {
                     SemesterId = semesterId,
-                    SubmitterId = user!.UserId,
+                    SubmitterId = user.UserId,
                     VieTitle = string.Empty,
-                    EngTitle = valueTuple.Name ?? "Untitled",
-                    ContextText = valueTuple.Context ?? "",
-                    SolutionText = valueTuple.Solution ?? "",
+                    EngTitle = x.Name,
+                    ContextText = x.Context,
+                    SolutionText = x.Solution,
                     DurationFrom = DateOnly.FromDateTime(DateTime.Today),
                     DurationTo = DateOnly.FromDateTime(DateTime.Today.AddMonths(4)),
                     Status = ProjectProposalStatus.Pending,
                     CreatedAt = DateTime.UtcNow,
-                    CreatedBy = user!.ToString(),
-                });
-            }
-            
-            var createdProposal = await _projectService.CreateManyAsync(proposals);
-
-            if (createdProposal.ResultCode != ResultCodeConst.SYS_Success0001)
-            {
-                return createdProposal;
-            }
-
-            var createdProposals = createdProposal.Data as List<ProjectProposalDto>;
-
-            // Upload embedding to OpenSearch
-            // Convert to vector
-            var proposalWithTextFinal = createdProposals!
-                .Zip(contexts, (created, original) => new
-                {
-                    Proposal = created,
-                    Text = original.Text
+                    CreatedBy = user.UserId.ToString(),
                 }).ToList();
 
-            var bulkPayload = new StringBuilder();
-            foreach (var item in proposalWithTextFinal)
+            var createProposalResult = await _projectService.CreateManyAsync(proposalDtos);
+
+            if (createProposalResult.ResultCode != ResultCodeConst.SYS_Success0001)
             {
-                var chunks = await _embeddingService.Embedding(item.Text);
-                foreach (var chunk in chunks)
-                {
-                    var indexMeta = new
-                    {
-                        index = new
-                        {
-                            _index = "topics",
-                            _id = $"{item.Proposal.ProjectProposalId}_{chunk.ChunkId}"
-                        }
-                    };
-
-                    var doc = new
-                    {
-                        topic_id = item.Proposal.ProjectProposalId,
-                        chunk_id = chunk.ChunkId,
-                        text = chunk.Text,
-                        vector_embedding = chunk.Vector
-                    };
-
-                    bulkPayload.AppendLine(JsonSerializer.Serialize(indexMeta));
-                    bulkPayload.AppendLine(JsonSerializer.Serialize(doc));
-                }
+                return createProposalResult;
             }
 
-            // send request to OpenSearch
-            var responseOpenSearch = await _instance.Value.BulkAsync<StringResponse>(
-                PostData.String(bulkPayload.ToString()),
-                new BulkRequestParameters
-                {
-                    Refresh = Refresh.True
-                }
-            );
-            // check for error
-            if (responseOpenSearch.HttpStatusCode is null or >= 400 ||
-                responseOpenSearch.Body.Contains("\"errors\":true"))
-            {
-                return new ServiceResult(ResultCodeConst.Proposal_Warning0002,
-                    await _msgService.GetMessageAsync(ResultCodeConst.Proposal_Warning0002));
-            }
+            var proposalEntities = (createProposalResult.Data as List<ProjectProposalDto>)!;
+
+            await UploadChunks(proposalEntities.Select((e, i) =>
+                (e.ProjectProposalId, extractedDocuments[i].Text, e.EngTitle)).ToList());
 
             return new ServiceResult(ResultCodeConst.Proposal_Success0002,
                 await _msgService.GetMessageAsync(ResultCodeConst.Proposal_Success0002));
         }
-        catch (Exception ex)
+        catch (Exception e)
         {
-            _logger.Error(ex.Message);
-            throw new Exception("Error invoke when progress upload data with file");
+            return new ServiceResult(ResultCodeConst.Proposal_Warning0001,
+                await _msgService.GetMessageAsync(ResultCodeConst.Proposal_Success0001) + ": " + e.Message);
         }
     }
+
+    // public async Task<IServiceResult> AddProposals(
+    //     List<(string Name, string Context, string Solution, string Text)> proposals, int semesterId, string email)
+    // {
+    //     try
+    //     {
+    //         var userResponse = await _userService.GetCurrentUserAsync(email);
+    //         if (userResponse.ResultCode != ResultCodeConst.SYS_Success0002)
+    //         {
+    //             return userResponse;
+    //         }
+    //
+    //         var user = (userResponse.Data as UserDto)!;
+    //
+    //         var proposalDtos = proposals.Select(x => new ProjectProposalDto
+    //         {
+    //             SemesterId = semesterId,
+    //             SubmitterId = user.UserId,
+    //             VieTitle = string.Empty,
+    //             EngTitle = x.Name,
+    //             ContextText = x.Context,
+    //             SolutionText = x.Solution,
+    //             DurationFrom = DateOnly.FromDateTime(DateTime.Today),
+    //             DurationTo = DateOnly.FromDateTime(DateTime.Today.AddMonths(4)),
+    //             Status = ProjectProposalStatus.Pending,
+    //             CreatedAt = DateTime.UtcNow,
+    //             CreatedBy = user.UserId.ToString(),
+    //         }).ToList();
+    //
+    //         var createProposalResult = await _projectService.CreateManyAsync(proposalDtos);
+    //
+    //         if (createProposalResult.ResultCode != ResultCodeConst.SYS_Success0001)
+    //         {
+    //             return createProposalResult;
+    //         }
+    //
+    //         var proposalEntities = (createProposalResult.Data as List<ProjectProposalDto>)!;
+    //
+    //         await UploadChunks(proposalEntities.Select((e, i) =>
+    //             (e.ProjectProposalId, proposals[i].Text, e.EngTitle)).ToList());
+    //
+    //         return new ServiceResult(ResultCodeConst.Proposal_Success0002,
+    //             await _msgService.GetMessageAsync(ResultCodeConst.Proposal_Success0002));
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         _logger.Error(ex.Message);
+    //         throw new Exception("Error invoke when progress upload data with file");
+    //     }
+    // }
 
 
     public async Task<IServiceResult> CheckDuplicatedProposal(List<IFormFile> files)
     {
         try
         {
-            var resultList = new List<ProposalAnalysisResult>();
+            var extractedDocuments = await _extractService.ExtractDocuments(files);
+            var documentEmbeddings =
+                await _extractService.ExtractTexts(extractedDocuments.Select(x => x.Text).ToList());
 
-            // Gửi files qua API lọc nội dung
-            var requestContent = new MultipartFormDataContent();
-            foreach (var file in files)
+            var tasks = extractedDocuments.Select(async (document, i) =>
             {
-                var stream = file.OpenReadStream();
-                var fileContent = new StreamContent(stream);
-                fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
-                requestContent.Add(fileContent, "topics", file.FileName);
-            }
+                var embeddings = documentEmbeddings[i].Select(e => e.Vector).ToList();
 
-            var request = new HttpRequestMessage(HttpMethod.Post, _getUrl)
-            {
-                Content = requestContent
-            };
-            request.Headers.Add("X-API-Key", _appSettings.FilterDataKey);
 
-            var response = await _httpClient.SendAsync(request);
-            var resultContent = await response.Content.ReadAsStringAsync();
-
-            if (!response.IsSuccessStatusCode)
-            {
-                return new ServiceResult(ResultCodeConst.Proposal_Warning0001,
-                    await _msgService.GetMessageAsync(ResultCodeConst.Proposal_Warning0001));
-            }
-
-            // Parse JSON thành List<ExtractedProposal>
-            var proposalsWithTexts = MapToProposal(resultContent); // List<ExtractedProposal>
-
-            foreach (var proposal in proposalsWithTexts)
-            {
-                var embeddings = (await _embeddingService.Embedding(proposal.Text))
-                    .Select(e => e.Vector).ToList();
-
-                var topicMatches = new Dictionary<int, List<TopicMatch>>();
+                var proposalMatches = new Dictionary<int, List<ProposalMatch>>();
                 var chunkResults = await QueryChunks(embeddings);
 
-                for (var i = 0; i < chunkResults.Count; i++)
+                for (var j = 0; j < chunkResults.Count; j++)
                 {
-                    foreach (var match in chunkResults[i])
+                    var uploadedChunkText = documentEmbeddings[i][j].Text;
+                    foreach (var match in chunkResults[j])
                     {
-                        if (match.Score < _appSettings.Threshold) continue;
+                        if (match.Similarity < _appSettings.Threshold) continue;
 
-                        if (!topicMatches.TryGetValue(match.TopicId, out var list))
+                        if (!proposalMatches.TryGetValue(match.ProposalId, out var list))
                         {
-                            list = new List<TopicMatch>();
-                            topicMatches[match.TopicId] = list;
+                            list = new List<ProposalMatch>();
+                            proposalMatches[match.ProposalId] = list;
                         }
 
-                        list.Add(match with { OriginChunkId = i });
+                        list.Add(match with { OriginChunkId = j, UploadedChunkText = uploadedChunkText });
                     }
                 }
 
                 var totalChunks = embeddings.Count;
-                var matchReports = topicMatches.Select(entry =>
+                var matchReports = proposalMatches.Select(entry =>
                 {
                     var distinctChunks = new HashSet<int>(entry.Value.Select(m => m.OriginChunkId!.Value));
                     return new MatchReport(
-                        entry.Key,
-                        distinctChunks.Count,
-                        CalcLongestContiguous(distinctChunks.ToList()),
-                        (double)distinctChunks.Count / totalChunks,
-                        entry.Value.Sum(m => m.Score) / entry.Value.Count,
-                        entry.Value.DistinctBy(m => m.ChunkId)
-                            .OrderByDescending(m => m.Score)
+                        ProposalId: entry.Key,
+                        Name: entry.Value[0].Name,
+                        // MatchCount: distinctChunks.Count,
+                        MatchCount: entry.Value.Count,
+                        LongestContiguous: CalcLongestContiguous(distinctChunks.ToList()),
+                        MatchRatio: (double)distinctChunks.Count / totalChunks,
+                        AvgSimilarity: entry.Value.Sum(m => m.Similarity) / entry.Value.Count,
+                        Matches: entry.Value
+                            // .DistinctBy(m => m.ChunkId)
+                            .OrderByDescending(m => m.Similarity)
                             .ToList()
                     );
                 }).ToList();
 
-                // Ghép dữ liệu lại cho từng proposal
-                resultList.Add(new ProposalAnalysisResult
+                return new ProposalAnalysisResult
                 {
-                    Name = proposal.Json.Name ?? string.Empty,
-                    Context = proposal.Json.Context ?? string.Empty,
-                    Solution = proposal.Json.Solution ?? string.Empty,
-                    Text = proposal.Text,
-                    MatchedTopics = matchReports
-                });
-            }
+                    Name = document.Name,
+                    Context = document.Context,
+                    Solution = document.Solution,
+                    Text = document.Text,
+                    MatchedProposals = matchReports
+                };
+            });
+
+            var resultList = await Task.WhenAll(tasks);
 
             return new ServiceResult(ResultCodeConst.Proposal_Success0001,
                 await _msgService.GetMessageAsync(ResultCodeConst.Proposal_Success0001))
@@ -380,70 +223,21 @@ public class ProposalService : IProposalService
                 Data = resultList
             };
         }
-        catch (Exception ex)
+        catch (Exception e)
         {
-            _logger.Error(ex.Message);
-            throw new Exception("Error occurred while checking duplicated proposal");
+            return new ServiceResult(ResultCodeConst.Proposal_Warning0001,
+                await _msgService.GetMessageAsync(ResultCodeConst.Proposal_Success0001) + ": " + e.Message);
         }
     }
 
-
-    private List<ProposalWithText> MapToProposal(string jsonResponse, int semesterId, Guid submitterId)
-    {
-        var proposals = new List<ProposalWithText>();
-
-        var extractedProposals = JsonSerializer.Deserialize<List<ExtractedProposal>>(jsonResponse,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-        if (extractedProposals is null)
-            return proposals;
-
-        foreach (var item in extractedProposals)
-        {
-            var proposalDto = new ProjectProposalDto
-            {
-                SemesterId = semesterId,
-                SubmitterId = submitterId,
-                VieTitle = string.Empty,
-                EngTitle = item.Json.Name ?? "Untitled",
-                ContextText = item.Json.Context ?? "",
-                SolutionText = item.Json.Solution ?? "",
-                DurationFrom = DateOnly.FromDateTime(DateTime.Today),
-                DurationTo = DateOnly.FromDateTime(DateTime.Today.AddMonths(4)),
-                Status = ProjectProposalStatus.Pending,
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = submitterId.ToString(),
-            };
-
-            proposals.Add(new ProposalWithText
-            {
-                Proposal = proposalDto,
-                Text = item.Text ?? ""
-            });
-        }
-
-        return proposals;
-    }
-
-    private List<ExtractedProposal> MapToProposal(string jsonResponse)
-    {
-        var extractedProposals = JsonSerializer.Deserialize<List<ExtractedProposal>>(jsonResponse,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-        if (extractedProposals is null)
-            return new List<ExtractedProposal>();
-
-        return extractedProposals;
-    }
-
-    private async Task<List<List<TopicMatch>>> QueryChunks(List<List<double>> vectors, int k = 5)
+    private async Task<List<List<ProposalMatch>>> QueryChunks(List<List<double>> vectors, int k = 5)
     {
         var mSearchPayload = new StringBuilder();
 
         vectors.ForEach(vector =>
         {
             mSearchPayload
-                .AppendLine(JsonSerializer.Serialize(new { index = "topics" }))
+                .AppendLine(JsonSerializer.Serialize(new { index = "proposals" }))
                 .AppendLine(JsonSerializer.Serialize(new
                 {
                     size = k,
@@ -459,28 +253,82 @@ public class ProposalService : IProposalService
 
         var body = PostData.String(mSearchPayload.ToString());
 
-        var stringResponse = await _instance.Value.MultiSearchAsync<StringResponse>(body);
+        var stringResponse = await _openSearchClient.MultiSearchAsync<StringResponse>(body);
 
         using var jsonDoc = JsonDocument.Parse(stringResponse.Body);
 
         return jsonDoc.RootElement
             .GetProperty("responses")
             .EnumerateArray()
-            .Select(res =>
+            .Select((res, i) =>
                 res.GetProperty("hits").GetProperty("hits").EnumerateArray()
                     .Select(hit =>
                     {
                         var source = hit.GetProperty("_source");
-                        return new TopicMatch(
-                            source.GetProperty("topic_id").GetInt32(),
+                        var vector = vectors[i];
+                        var resVector = source.GetProperty("vector_embedding").EnumerateArray()
+                            .Select(x => x.GetDouble()).ToList();
+
+                        return new ProposalMatch(
+                            source.GetProperty("proposal_id").GetInt32(),
+                            source.GetProperty("name").GetString()!,
                             source.GetProperty("chunk_id").GetInt32(),
                             source.GetProperty("text").GetString()!,
-                            source.GetProperty("vector_embedding").EnumerateArray().Select(e => e.GetDouble()).ToList(),
                             hit.GetProperty("_score").GetDouble(),
-                            null
+                            CosineSimilarity(resVector, vector),
+                            null, null
                         );
                     }).ToList()
             ).ToList();
+    }
+
+    private async Task UploadChunks(List<(int ProjectProposalId, string Text, string Name)> proposals)
+    {
+        var bulkPayload = new StringBuilder();
+        var textChunks = await _extractService.ExtractTexts(proposals.Select(p => p.Text).ToList());
+        for (var i = 0; i < proposals.Count; i++)
+        {
+            var proposal = proposals[i];
+            var chunks = textChunks[i];
+            foreach (var chunk in chunks)
+            {
+                var indexMeta = new
+                {
+                    index = new
+                    {
+                        _index = "proposals",
+                        _id = $"{proposal.ProjectProposalId}_{chunk.ChunkId}"
+                    }
+                };
+
+                var doc = new
+                {
+                    proposal_id = proposal.ProjectProposalId,
+                    name = proposal.Name,
+                    chunk_id = chunk.ChunkId,
+                    text = chunk.Text,
+                    vector_embedding = chunk.Vector
+                };
+
+                bulkPayload.AppendLine(JsonSerializer.Serialize(indexMeta));
+                bulkPayload.AppendLine(JsonSerializer.Serialize(doc));
+            }
+        }
+
+        // send request to OpenSearch
+        var responseOpenSearch = await _openSearchClient.BulkAsync<StringResponse>(
+            PostData.String(bulkPayload.ToString()),
+            new BulkRequestParameters
+            {
+                Refresh = Refresh.True
+            }
+        );
+        // check for error
+        if (responseOpenSearch.HttpStatusCode is null or >= 400 ||
+            responseOpenSearch.Body.Contains("\"errors\":true"))
+        {
+            throw new Exception("Errors while upload chunks: " + responseOpenSearch.Body);
+        }
     }
 
     private int CalcLongestContiguous(List<int> ids)
@@ -496,5 +344,27 @@ public class ProposalService : IProposalService
         });
 
         return best;
+    }
+
+    private double CosineSimilarity(List<double> vectorA, List<double> vectorB)
+    {
+        if (vectorA.Count != vectorB.Count)
+            throw new ArgumentException("Vectors must be of the same length");
+
+        double dotProduct = 0.0;
+        double normA = 0.0;
+        double normB = 0.0;
+
+        for (int i = 0; i < vectorA.Count; i++)
+        {
+            dotProduct += vectorA[i] * vectorB[i];
+            normA += vectorA[i] * vectorA[i];
+            normB += vectorB[i] * vectorB[i];
+        }
+
+        if (normA == 0 || normB == 0)
+            return 0.0; // tránh chia cho 0
+
+        return dotProduct / (Math.Sqrt(normA) * Math.Sqrt(normB));
     }
 }
