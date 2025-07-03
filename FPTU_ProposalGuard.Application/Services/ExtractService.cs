@@ -39,6 +39,7 @@ public class ExtractService(IOptionsMonitor<CheckProposalSettings> appSettings) 
         {
             // ignored
         }
+
         if (errorMessage != null) throw new Exception(errorMessage);
 
         return jsonDoc.RootElement.EnumerateArray()
@@ -76,12 +77,12 @@ public class ExtractService(IOptionsMonitor<CheckProposalSettings> appSettings) 
         var response = await httpClient.SendAsync(request);
         var resultContent = await response.Content.ReadAsStringAsync();
         using var jsonDoc = JsonDocument.Parse(resultContent);
-        
+
         string? errorMessage = null;
         try
         {
-             errorMessage = jsonDoc.RootElement.TryGetProperty("message", out var message) &&
-                               message.ValueKind == JsonValueKind.String
+            errorMessage = jsonDoc.RootElement.TryGetProperty("message", out var message) &&
+                           message.ValueKind == JsonValueKind.String
                 ? message.GetString()
                 : null;
         }
@@ -89,6 +90,7 @@ public class ExtractService(IOptionsMonitor<CheckProposalSettings> appSettings) 
         {
             // ignored
         }
+
         if (errorMessage != null) throw new Exception(errorMessage);
 
         return jsonDoc.RootElement.EnumerateArray()
@@ -104,8 +106,86 @@ public class ExtractService(IOptionsMonitor<CheckProposalSettings> appSettings) 
                 }
             ).ToList();
     }
+
+    public async Task<List<ExtractedFullContentDocument>> ExtractFullContentDocuments(List<IFormFile> files)
+    {
+        var httpClient = new HttpClient();
+        var requestContent = new MultipartFormDataContent();
+        foreach (var file in files)
+        {
+            var stream = file.OpenReadStream();
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+            requestContent.Add(fileContent, "topics", file.FileName);
+        }
+
+        var request = new HttpRequestMessage(HttpMethod.Post, _settings.ExtractDocumentUrl + "?fullContent=true")
+        {
+            Content = requestContent
+        };
+        request.Headers.Add("X-API-Key", _settings.ExtractDocumentApiKey);
+
+
+        var response = await httpClient.SendAsync(request);
+        var resultContent = await response.Content.ReadAsStringAsync();
+        using var jsonDoc = JsonDocument.Parse(resultContent);
+
+        string? errorMessage = null;
+        try
+        {
+            errorMessage = jsonDoc.RootElement.TryGetProperty("message", out var message) &&
+                           message.ValueKind == JsonValueKind.String
+                ? message.GetString()
+                : null;
+        }
+        catch (Exception)
+        {
+            // ignored
+        }
+
+        if (errorMessage != null) throw new Exception(errorMessage);
+
+        return jsonDoc.RootElement.EnumerateArray()
+            .Select(proposal =>
+                {
+                    var json = proposal.GetProperty("json");
+                    return new ExtractedFullContentDocument(
+                        json.GetProperty("engTitle").GetString() ?? "",
+                        json.GetProperty("vieTitle").GetString() ?? "",
+                        json.GetProperty("durationFrom").GetString() ?? "",
+                        json.GetProperty("durationTo").GetString() ?? "",
+                        json.GetProperty("supervisors").ToString(),
+                        json.GetProperty("students").ToString() ?? "",
+                        json.GetProperty("context").GetString() ?? "",
+                        json.GetProperty("solution").GetString() ?? "",
+                        proposal.GetProperty("text").GetString() ?? "",
+                        json.GetProperty("functionalRequirements").ToString() ?? "",
+                        json.GetProperty("nonFunctionalRequirements").ToString() ?? "",
+                        json.GetProperty("technicalStack").ToString() ?? "",
+                        json.GetProperty("tasks").ToString() ?? "",
+                        proposal.GetProperty("text").GetString() ?? ""
+                    );
+                }
+            ).ToList();
+    }
 }
 
 public record Chunk(int ChunkId, string Text, List<double> Vector);
 
 public record ExtractedDocument(string Name, string Context, string Solution, string Text);
+
+public record ExtractedFullContentDocument(
+    string EngTitle,
+    string VieTitle,
+    string DurationFrom,
+    string DurationTo,
+    string Supervisors,
+    string Students,
+    string Context,
+    string Solution,
+    string Abbreviation,
+    string FunctionalRequirements,
+    string NonFunctionalRequirements,
+    string TechnicalStack,
+    string Tasks,
+    string Text);
