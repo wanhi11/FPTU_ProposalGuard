@@ -18,5 +18,7 @@ public class MappingRegistration : IRegister
         config.NewConfig<SystemRole, SystemRoleDto>();
         config.NewConfig<SystemMessage, SystemMessageDto>();
         config.NewConfig<ProjectProposal, ProjectProposalDto>();    
+        config.NewConfig<ProposalStudent, ProposalStudentDto>();    
+        config.NewConfig<ProposalSupervisor, ProposalSupervisorDto>();    
     }
 }

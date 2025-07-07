@@ -285,4 +285,12 @@ public class ResultCodeConst
     /// </summary>
     public static string Proposal_Warning0002 = "Proposal.Warning0002";
     #endregion
+
+    #region ProposalStudent
+    /// <summary>
+    /// [SUCCESS] Create students successfully
+    /// </summary>
+    public static string ProposalStudent_Success0001 = "ProposalStudent.Success0001";
+    
+    #endregion
 }

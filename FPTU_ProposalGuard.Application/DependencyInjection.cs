@@ -35,6 +35,8 @@ public static class DependencyInjection
         services.AddScoped<IProposalService, ProposalService>();
         services.AddScoped<IProjectProposalService<ProjectProposalDto>, ProjectProposalService>();
         services.AddScoped<IExtractService,ExtractService>();
+        services.AddScoped<IProposalStudentService<ProposalStudentDto>, ProposalStudentService>();
+        services.AddScoped<IProposalSupervisorService<ProposalSupervisorDto>, ProposalSupervisorService>();
         
         return services
             .ConfigureMapster() // Add mapster

@@ -10,6 +10,7 @@ using FPTU_ProposalGuard.Application.Dtos.Proposals;
 using FPTU_ProposalGuard.Application.Dtos.Users;
 using FPTU_ProposalGuard.Application.Services.IExternalServices;
 using FPTU_ProposalGuard.Domain.Common.Enums;
+using FPTU_ProposalGuard.Domain.Entities;
 using OpenSearch.Net;
 using Serilog;
 using ProjectProposalDto = FPTU_ProposalGuard.Application.Dtos.Proposals.ProjectProposalDto;
@@ -60,17 +61,18 @@ public class ProposalService : IProposalService
                 return userResponse;
             }
 
-            var extractedDocuments = await _extractService.ExtractDocuments(files);
+            var extractedDocuments = await _extractService.ExtractFullContentDocuments(files);
 
             var user = (userResponse.Data as UserDto)!;
 
+            // Extract proposal details from the documents
             var proposalDtos = extractedDocuments
                 .Select(x => new ProjectProposalDto
                 {
                     SemesterId = semesterId,
                     SubmitterId = user.UserId,
                     VieTitle = string.Empty,
-                    EngTitle = x.Name,
+                    EngTitle = x.EngTitle,
                     ContextText = x.Context,
                     SolutionText = x.Solution,
                     DurationFrom = DateOnly.FromDateTime(DateTime.Today),
@@ -79,7 +81,38 @@ public class ProposalService : IProposalService
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = user.UserId.ToString(),
                 }).ToList();
-
+            // Extract proposal supervisors from the documents
+            var allSupervisors = extractedDocuments
+                .Zip(proposalDtos, (doc, proposal) =>
+                    JsonSerializer.Deserialize<List<ExtractedProposalSupervisorDto>>(doc.Supervisors)?.Select(sup =>
+                        new ProposalSupervisorDto
+                        {
+                            ProjectProposalId = proposal.ProjectProposalId,
+                            FullName = sup.FullName,
+                            Email = sup.Email,
+                            Phone = sup.Phone,
+                            SupervisorNo = null,
+                            TitlePrefix = null
+                        }) ?? new List<ProposalSupervisorDto>()
+                ).SelectMany(x => x).ToList();
+            
+            
+            // Extract proposal students from the documents
+            
+            var allStudents = extractedDocuments
+                .Zip(proposalDtos, (doc, proposal) =>
+                    JsonSerializer.Deserialize<List<ExtractedProposalStudentDto>>(doc.Students)?.Select(student =>
+                        new ProposalStudentDto
+                        {
+                            ProjectProposalId = proposal.ProjectProposalId,
+                            FullName = student.FullName,
+                            StudentCode = student.StudentCode,
+                            Email = student.Email,
+                            Phone = student.Phone,
+                            RoleInGroup = null
+                        }) ?? new List<ProposalStudentDto>()
+                ).SelectMany(x => x).ToList();
+            
             var createProposalResult = await _projectService.CreateManyAsync(proposalDtos);
 
             if (createProposalResult.ResultCode != ResultCodeConst.SYS_Success0001)

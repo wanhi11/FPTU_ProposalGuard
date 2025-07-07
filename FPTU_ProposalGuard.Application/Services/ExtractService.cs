@@ -5,12 +5,21 @@ using FPTU_ProposalGuard.Application.Configurations;
 using FPTU_ProposalGuard.Application.Services.IExternalServices;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
+using Serilog;
 
 namespace FPTU_ProposalGuard.Application.Services;
 
-public class ExtractService(IOptionsMonitor<CheckProposalSettings> appSettings) : IExtractService
+public class ExtractService : IExtractService
 {
-    private readonly CheckProposalSettings _settings = appSettings.CurrentValue;
+    private readonly ILogger _logger;
+    private readonly CheckProposalSettings _settings;
+
+    public ExtractService(ILogger logger
+        , IOptionsMonitor<CheckProposalSettings> appSettings)
+    {
+        _logger = logger;
+        _settings = appSettings.CurrentValue;
+    }
 
     public async Task<List<List<Chunk>>> ExtractTexts(List<string> texts)
     {
@@ -35,9 +44,10 @@ public class ExtractService(IOptionsMonitor<CheckProposalSettings> appSettings) 
                 ? message.GetString()
                 : null;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // ignored
+            _logger.Error(ex.Message);
+            throw new Exception("Error invoke when getting properties from response");
         }
 
         if (errorMessage != null) throw new Exception(errorMessage);
@@ -86,9 +96,10 @@ public class ExtractService(IOptionsMonitor<CheckProposalSettings> appSettings) 
                 ? message.GetString()
                 : null;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // ignored
+            _logger.Error(ex.Message);
+            throw new Exception("Error invoke when getting properties from response");
         }
 
         if (errorMessage != null) throw new Exception(errorMessage);
