@@ -61,6 +61,8 @@ namespace FPTU_ProposalGuard.API.Extensions
             services.Configure<GoogleAuthSettings>(builder.Configuration.GetSection("GoogleAuthSettings"));
             // Configure CheckProposalSettings
             services.Configure<CheckProposalSettings>(builder.Configuration.GetSection("CheckProposalSettings"));
+            // Configure AmazonS3Settings
+            services.Configure<AmazonS3Settings>(builder.Configuration.GetSection("AmazonS3Settings"));
             return services;
         }
 
