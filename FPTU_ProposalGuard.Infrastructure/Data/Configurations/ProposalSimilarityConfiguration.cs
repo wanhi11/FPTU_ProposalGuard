@@ -13,32 +13,39 @@ public class ProposalSimilarityConfiguration : IEntityTypeConfiguration<Proposal
         builder.ToTable("Proposal_Similarity");
 
         builder.Property(e => e.SimilarityId).HasColumnName("similarity_id");
-        builder.Property(e => e.CheckedOn)
-            .HasColumnType("datetime")
-            .HasColumnName("checked_on");
-        builder.Property(e => e.CheckedProposalId).HasColumnName("checked_proposal_id");
-        builder.Property(e => e.ContextScore)
-            .HasColumnType("decimal(5, 2)")
-            .HasColumnName("context_score");
+
+        builder.Property(e => e.HistoryId).HasColumnName("history_id");
+
         builder.Property(e => e.ExistingProposalId).HasColumnName("existing_proposal_id");
+
+        builder.Property(e => e.MatchRatio)
+            .HasColumnType("decimal(5, 2)")
+            .HasColumnName("match_ratio");
+
+        builder.Property(e => e.MatchCount).HasColumnName("match_count");
+
+        builder.Property(e => e.LongestSequence).HasColumnName("longest_sequence");
+
         builder.Property(e => e.OverallScore)
             .HasColumnType("decimal(5, 2)")
             .HasColumnName("overall_score");
-        builder.Property(e => e.SolutionScore)
-            .HasColumnType("decimal(5, 2)")
-            .HasColumnName("solution_score");
-        builder.Property(e => e.TitleScore)
-            .HasColumnType("decimal(5, 2)")
-            .HasColumnName("title_score");
 
-        builder.HasOne(d => d.CheckedProposal).WithMany(p => p.ProposalSimilarityCheckedProposals)
-            .HasForeignKey(d => d.CheckedProposalId)
-            .OnDelete(DeleteBehavior.ClientSetNull)
-            .HasConstraintName("FK_ProposalSimilaryty_CheckedProposalId");
+        builder.HasOne(e => e.ProposalHistory)
+            .WithMany(h => h.SimilarProposals)
+            .HasForeignKey(e => e.HistoryId)
+            .OnDelete(DeleteBehavior.Cascade)
+            .HasConstraintName("FK_ProposalSimilarity_HistoryId");
 
-        builder.HasOne(d => d.ExistingProposal).WithMany(p => p.ProposalSimilarityExistingProposals)
-            .HasForeignKey(d => d.ExistingProposalId)
+        builder.HasOne(e => e.ExistingProposal)
+            .WithMany(p => p.ProposalSimilarityExistingProposals)
+            .HasForeignKey(e => e.ExistingProposalId)
             .OnDelete(DeleteBehavior.ClientSetNull)
-            .HasConstraintName("FK_ProposalSimilaryty_ExistingProposalId");
+            .HasConstraintName("FK_ProposalSimilarity_ExistingProposalId");
+
+        builder.HasMany(e => e.MatchedSegments)
+            .WithOne(s => s.ProposalSimilarity)
+            .HasForeignKey(s => s.SimilarityId)
+            .OnDelete(DeleteBehavior.Cascade)
+            .HasConstraintName("FK_ProposalMatchedSegment_SimilarityId");
     }
 }

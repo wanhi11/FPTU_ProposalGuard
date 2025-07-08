@@ -1,5 +1,4 @@
 ﻿using System.Reflection;
-using FPTU_ProposalGuard.Application.Dtos;
 using FPTU_ProposalGuard.Application.Dtos.Authentications;
 using FPTU_ProposalGuard.Application.Dtos.Notifications;
 using FPTU_ProposalGuard.Application.Dtos.Proposals;
@@ -33,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<IUserService<UserDto>, UserService>();
         services.AddScoped<ISystemRoleService<SystemRoleDto>, SystemRoleService>();
         services.AddScoped<IProposalService, ProposalService>();
+        services.AddScoped<IS3Service, S3Service>();
         services.AddScoped<IProjectProposalService<ProjectProposalDto>, ProjectProposalService>();
         services.AddScoped<IExtractService,ExtractService>();
         services.AddScoped<IProposalStudentService<ProposalStudentDto>, ProposalStudentService>();

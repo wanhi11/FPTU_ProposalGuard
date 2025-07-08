@@ -13,27 +13,44 @@ public class ProposalHistoryConfiguration : IEntityTypeConfiguration<ProposalHis
         builder.ToTable("Proposal_History");
 
         builder.Property(e => e.HistoryId).HasColumnName("history_id");
-        builder.Property(e => e.Comment).HasColumnName("comment");
-        builder.Property(e => e.NewStatus)
+
+        builder.Property(e => e.ProjectProposalId).HasColumnName("project_proposal_id");
+
+        builder.Property(e => e.Status)
             .HasMaxLength(50)
-            .HasColumnName("new_status");
-        builder.Property(e => e.OldStatus)
-            .HasMaxLength(50)
-            .HasColumnName("old_status");
+            .HasColumnName("status");
+
+        builder.Property(e => e.Version).HasColumnName("version");
+
+        builder.Property(e => e.Url)
+            .HasMaxLength(255)
+            .HasColumnName("url");
+
+        builder.Property(e => e.Comment)
+            .HasColumnName("comment");
+
         builder.Property(e => e.ProcessById).HasColumnName("process_by_id");
+
         builder.Property(e => e.ProcessDate)
             .HasColumnType("datetime")
             .HasColumnName("process_date");
-        builder.Property(e => e.ProjectProposalId).HasColumnName("project_proposal_id");
 
-        builder.HasOne(d => d.ProcessBy).WithMany(p => p.ProposalHistories)
-            .HasForeignKey(d => d.ProcessById)
+        builder.HasOne(e => e.ProcessBy)
+            .WithMany(u => u.ProposalHistories)
+            .HasForeignKey(e => e.ProcessById)
             .OnDelete(DeleteBehavior.ClientSetNull)
-            .HasConstraintName("PK_ProposalHistory_ProcessById");
+            .HasConstraintName("FK_ProposalHistory_ProcessById");
 
-        builder.HasOne(d => d.ProjectProposal).WithMany(p => p.ProposalHistories)
-            .HasForeignKey(d => d.ProjectProposalId)
+        builder.HasOne(e => e.ProjectProposal)
+            .WithMany(p => p.ProposalHistories)
+            .HasForeignKey(e => e.ProjectProposalId)
             .OnDelete(DeleteBehavior.ClientSetNull)
             .HasConstraintName("FK_ProposalHistory_ProjectProposalId");
+
+        builder.HasMany(e => e.SimilarProposals)
+            .WithOne(s => s.ProposalHistory)
+            .HasForeignKey(s => s.HistoryId)
+            .OnDelete(DeleteBehavior.Cascade)
+            .HasConstraintName("FK_ProposalSimilarity_HistoryId");
     }
 }
