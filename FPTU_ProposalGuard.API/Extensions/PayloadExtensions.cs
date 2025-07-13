@@ -108,7 +108,7 @@ public static class PayloadExtensions
                             MatchCount = similarity.MatchCount,
                             MatchRatio = similarity.MatchRatio,
                             LongestSequence = similarity.LongestContiguous,
-                            OverallScore = similarity.OverallScore,
+                            OverallScore = (decimal)similarity.OverallScore,
                             MatchedSegments = similarity.Segments.Select(s => new ProposalMatchedSegmentDto
                             {
                                 Context = s.Text,
@@ -153,7 +153,7 @@ public static class PayloadExtensions
                         MatchCount = similarity.MatchCount,
                         MatchRatio = similarity.MatchRatio,
                         LongestSequence = similarity.LongestContiguous,
-                        OverallScore = similarity.OverallScore,
+                        OverallScore = (decimal)similarity.OverallScore,
                         MatchedSegments = similarity.Segments.Select(s => new ProposalMatchedSegmentDto
                         {
                             Context = s.Text,

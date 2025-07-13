@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace FPTU_ProposalGuard.API.Controllers;
 
-public class ProposalController(IProposalService proposalService, IHistoryRepository historyRepository) : ControllerBase
+public class ProposalController(IProposalService proposalService) : ControllerBase
 {
     [Authorize]
     [HttpPost(APIRoute.Proposal.AddProposalsWithFiles, Name = nameof(AddProposalsWithFiles))]
