@@ -6,5 +6,6 @@ namespace FPTU_ProposalGuard.Domain.Interfaces.Services;
 public interface IProjectProposalService <TDto> : IGenericService<ProjectProposal, TDto, int>
     where TDto : class
 {
-    Task<IServiceResult> CreateManyAsync(List<TDto> dtos);  
+    Task<IServiceResult> CreateManyAsync(List<TDto> dtos);
+    Task<IServiceResult> GetByIdAsync(int id);
 }

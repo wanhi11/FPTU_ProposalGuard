@@ -8,12 +8,14 @@ public class ProposalStudentConfiguration : IEntityTypeConfiguration<ProposalStu
 {
     public void Configure(EntityTypeBuilder<ProposalStudent> builder)
     {
-        builder.HasKey(e => e.ProjectProposalId).HasName("PK_ProposalStudent_ProposalId");
+        builder.HasKey(e => e.ProposalStudentId).HasName("PK_ProposalStudent_ProposalStudentId");
 
         builder.ToTable("Proposal_Student");
 
+        builder.Property(e => e.ProposalStudentId)
+            .ValueGeneratedOnAdd()
+            .HasColumnName("proposal_student_id");
         builder.Property(e => e.ProjectProposalId)
-            .ValueGeneratedNever()
             .HasColumnName("project_proposal_id");
         builder.Property(e => e.Email)
             .HasMaxLength(255)
@@ -31,8 +33,9 @@ public class ProposalStudentConfiguration : IEntityTypeConfiguration<ProposalStu
             .HasMaxLength(50)
             .HasColumnName("student_code");
 
-        builder.HasOne(d => d.ProjectProposal).WithOne(p => p.ProposalStudent)
-            .HasForeignKey<ProposalStudent>(d => d.ProjectProposalId)
+        builder.HasOne(d => d.ProjectProposal)
+            .WithMany(p => p.ProposalStudents)
+            .HasForeignKey(d => d.ProjectProposalId)
             .OnDelete(DeleteBehavior.ClientSetNull)
             .HasConstraintName("FK_ProposalStudent_ProposalId");
     }

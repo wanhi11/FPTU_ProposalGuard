@@ -284,5 +284,21 @@ public class ResultCodeConst
     /// [WARNING] OpenSearch Bulk Error
     /// </summary>
     public static string Proposal_Warning0002 = "Proposal.Warning0002";
+    /// <summary>
+    /// [WARNING] Approved User can not be processed user
+    /// </summary>
+    public static string Proposal_Warning0003 = "Proposal.Warning0003";
+    /// <summary>
+    /// [WARNING] Only Pending can be changed to Approved or Rejected	
+    /// </summary>
+    public static string Proposal_Warning0004 = "Proposal.Warning0004";
+    #endregion
+
+    #region ProposalStudent
+    /// <summary>
+    /// [SUCCESS] Create students successfully
+    /// </summary>
+    public static string ProposalStudent_Success0001 = "ProposalStudent.Success0001";
+    
     #endregion
 }

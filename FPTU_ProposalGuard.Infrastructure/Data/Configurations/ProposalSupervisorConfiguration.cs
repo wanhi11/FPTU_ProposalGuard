@@ -8,12 +8,14 @@ public class ProposalSupervisorConfiguration : IEntityTypeConfiguration<Proposal
 {
     public void Configure(EntityTypeBuilder<ProposalSupervisor> builder)
     {
-        builder.HasKey(e => e.ProjectProposalId).HasName("PK_ProposalSupervisor_ProposalId");
+        builder.HasKey(e => e.ProposalSupervisorId).HasName("PK_ProposalSupervisor_ProposalSupervisorId");
 
         builder.ToTable("Proposal_Supervisor");
 
+        builder.Property(e => e.ProposalSupervisorId)
+            .ValueGeneratedOnAdd()
+            .HasColumnName("proposal_supervisor_id");
         builder.Property(e => e.ProjectProposalId)
-            .ValueGeneratedNever()
             .HasColumnName("project_proposal_id");
         builder.Property(e => e.Email)
             .HasMaxLength(255)
@@ -31,8 +33,9 @@ public class ProposalSupervisorConfiguration : IEntityTypeConfiguration<Proposal
             .HasMaxLength(50)
             .HasColumnName("title_prefix");
 
-        builder.HasOne(d => d.ProjectProposal).WithOne(p => p.ProposalSupervisor)
-            .HasForeignKey<ProposalSupervisor>(d => d.ProjectProposalId)
+        builder.HasOne(d => d.ProjectProposal)
+            .WithMany(p => p.ProposalSupervisors)
+            .HasForeignKey(d => d.ProjectProposalId)
             .OnDelete(DeleteBehavior.ClientSetNull)
             .HasConstraintName("FK_ProposalSupervisor_ProposalId");
     }

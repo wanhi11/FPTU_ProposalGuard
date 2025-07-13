@@ -18,5 +18,18 @@ public class MappingRegistration : IRegister
         config.NewConfig<SystemRole, SystemRoleDto>();
         config.NewConfig<SystemMessage, SystemMessageDto>();
         config.NewConfig<ProjectProposal, ProjectProposalDto>();    
+        config.NewConfig<ProposalStudent, ProposalStudentDto>();    
+        config.NewConfig<ProposalSupervisor, ProposalSupervisorDto>();    
+        config.NewConfig<ProposalHistory, ProposalHistoryDto>();    
+        config.NewConfig<ProposalSimilarity, ProposalSimilarityDto>();    
+        config.NewConfig<ProposalMatchedSegment, ProposalMatchedSegmentDto>();    
+        
+        // From [Dto] to [Entity]
+        config.NewConfig<ProjectProposalDto, ProjectProposal>()
+            .IgnoreNullValues(true);
+        config.NewConfig<ProposalStudentDto, ProposalStudent>()
+            .IgnoreNullValues(true);
+        config.NewConfig<ProposalSupervisorDto, ProposalSupervisor>()
+            .IgnoreNullValues(true);
     }
 }

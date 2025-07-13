@@ -52,4 +52,7 @@ public class ProjectProposalDto
     public UserDto? Approver { get; set; }
 
     public UserDto Submitter { get; set; } = null!;
+    public ICollection<ProposalStudentDto>? ProposalStudents { get; set; } = new List<ProposalStudentDto>();
+    public ICollection<ProposalSupervisorDto>? ProposalSupervisors { get; set; } = new List<ProposalSupervisorDto>();
+    public ICollection<ProposalHistoryDto> ProposalHistories { get; set; } = new List<ProposalHistoryDto>();
 }

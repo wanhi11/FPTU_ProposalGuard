@@ -137,14 +137,12 @@ public class DatabaseInitializer(FptuProposalGuardDbContext context, ILogger log
         {
             new()
             {
-                SemesterId = 1,
                 Term = Term.Spring,
                 Year = 2025,
                 SemesterCode = "SP25"
             },
             new()
             {
-                SemesterId = 2,
                 Term = Term.Summer,
                 Year = 2025,
                 SemesterCode = "SU25"
