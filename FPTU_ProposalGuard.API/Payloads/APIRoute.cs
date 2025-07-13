@@ -108,10 +108,14 @@ public class APIRoute
     public static class Proposal
     {
         //[GET]
-        public const string CheckDuplicatedProposal = Base + "/proposals/check-duplicate";
+        public const string GetById = Base + "/proposals/{id}";
         //[POST]
         public const string AddProposalsWithFiles = Base + "/proposals/files";
         public const string AddProposals = Base + "/proposals";
+        public const string CheckDuplicatedProposal = Base + "/proposals/check-duplicate";
+        //[PUT]
+        public const string UpdateStatus = Base + "/proposals/history/status";
+        public const string ReUploadProposal = Base + "/proposals/re-upload/{proposalId}";
         
     }
 }

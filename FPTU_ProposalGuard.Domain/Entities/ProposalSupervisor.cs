@@ -2,6 +2,7 @@
 
 public class ProposalSupervisor
 {
+    public int ProposalSupervisorId { get; set; }
     public int ProjectProposalId { get; set; }
 
     public string? SupervisorNo { get; set; }

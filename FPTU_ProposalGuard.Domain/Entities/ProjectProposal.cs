@@ -57,10 +57,10 @@ public class ProjectProposal : IAuditableEntity
 
     public ICollection<ProposalSimilarity> ProposalSimilarityExistingProposals { get; set; } = new List<ProposalSimilarity>();
 
-    public ProposalStudent? ProposalStudent { get; set; }
+    public ICollection<ProposalStudent>? ProposalStudents { get; set; } = new List<ProposalStudent>();
 
-    public ProposalSupervisor? ProposalSupervisor { get; set; }
-
+    public ICollection<ProposalSupervisor>? ProposalSupervisors { get; set; } = new List<ProposalSupervisor>();
+    
     public Semester Semester { get; set; } = null!;
 
     public User Submitter { get; set; } = null!;

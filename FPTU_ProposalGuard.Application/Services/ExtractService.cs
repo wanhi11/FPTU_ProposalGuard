@@ -33,16 +33,19 @@ public class ExtractService : IExtractService
         request.Headers.Add("X-API-Key", _settings.ExtractTextApiKey);
         var response = await httpClient.SendAsync(request);
         if (!response.IsSuccessStatusCode) throw new Exception("Fail to extract");
+
         var jsonString = await response.Content.ReadAsStringAsync();
         using var jsonDoc = JsonDocument.Parse(jsonString);
 
         string? errorMessage = null;
         try
         {
-            errorMessage = jsonDoc.RootElement.TryGetProperty("message", out var message) &&
-                           message.ValueKind == JsonValueKind.String
-                ? message.GetString()
-                : null;
+            if (jsonDoc.RootElement.ValueKind == JsonValueKind.Object &&
+                jsonDoc.RootElement.TryGetProperty("message", out var message) &&
+                message.ValueKind == JsonValueKind.String)
+            {
+                errorMessage = message.GetString();
+            }
         }
         catch (Exception ex)
         {
@@ -52,18 +55,17 @@ public class ExtractService : IExtractService
 
         if (errorMessage != null) throw new Exception(errorMessage);
 
-        return jsonDoc.RootElement.EnumerateArray()
+        var result = jsonDoc.RootElement.EnumerateArray()
             .Select(textChunks =>
-                textChunks.EnumerateArray().Select((chunk) =>
-                    {
-                        return new Chunk(
-                            chunk.GetProperty("chunkId").GetInt32(),
-                            chunk.GetProperty("text").GetString() ?? "",
-                            chunk.GetProperty("vector").EnumerateArray().Select(e => e.GetDouble()).ToList()
-                        );
-                    }
+                textChunks.EnumerateArray().Select(chunk =>
+                    new Chunk(
+                        chunk.GetProperty("chunkId").GetInt32(),
+                        chunk.GetProperty("text").GetString() ?? "",
+                        chunk.GetProperty("vector").EnumerateArray().Select(e => e.GetDouble()).ToList()
+                    )
                 ).ToList()
             ).ToList();
+        return result;
     }
 
     public async Task<List<ExtractedDocument>> ExtractDocuments(List<IFormFile> files)
@@ -91,10 +93,12 @@ public class ExtractService : IExtractService
         string? errorMessage = null;
         try
         {
-            errorMessage = jsonDoc.RootElement.TryGetProperty("message", out var message) &&
-                           message.ValueKind == JsonValueKind.String
-                ? message.GetString()
-                : null;
+            if (jsonDoc.RootElement.ValueKind == JsonValueKind.Object &&
+                jsonDoc.RootElement.TryGetProperty("message", out var message) &&
+                message.ValueKind == JsonValueKind.String)
+            {
+                errorMessage = message.GetString();
+            }
         }
         catch (Exception ex)
         {
@@ -144,10 +148,12 @@ public class ExtractService : IExtractService
         string? errorMessage = null;
         try
         {
-            errorMessage = jsonDoc.RootElement.TryGetProperty("message", out var message) &&
-                           message.ValueKind == JsonValueKind.String
-                ? message.GetString()
-                : null;
+            if (jsonDoc.RootElement.ValueKind == JsonValueKind.Object &&
+                jsonDoc.RootElement.TryGetProperty("message", out var message) &&
+                message.ValueKind == JsonValueKind.String)
+            {
+                errorMessage = message.GetString();
+            }
         }
         catch (Exception)
         {
@@ -156,7 +162,7 @@ public class ExtractService : IExtractService
 
         if (errorMessage != null) throw new Exception(errorMessage);
 
-        return jsonDoc.RootElement.EnumerateArray()
+        var result = jsonDoc.RootElement.EnumerateArray()
             .Select(proposal =>
                 {
                     var json = proposal.GetProperty("json");
@@ -169,7 +175,7 @@ public class ExtractService : IExtractService
                         json.GetProperty("students").ToString() ?? "",
                         json.GetProperty("context").GetString() ?? "",
                         json.GetProperty("solution").GetString() ?? "",
-                        proposal.GetProperty("text").GetString() ?? "",
+                        json.GetProperty("abbreviation").GetString() ?? "",
                         json.GetProperty("functionalRequirements").ToString() ?? "",
                         json.GetProperty("nonFunctionalRequirements").ToString() ?? "",
                         json.GetProperty("technicalStack").ToString() ?? "",
@@ -178,6 +184,65 @@ public class ExtractService : IExtractService
                     );
                 }
             ).ToList();
+        return result;
+    }
+
+    public async Task<ExtractedFullContentDocument> ExtractFullContentDocument(IFormFile file)
+    {
+        var httpClient = new HttpClient();
+        var requestContent = new MultipartFormDataContent();
+
+        using var stream = file.OpenReadStream();
+        var fileContent = new StreamContent(stream);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+        requestContent.Add(fileContent, "topics", file.FileName);
+
+        var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            _settings.ExtractDocumentUrl + "?fullContent=true")
+        {
+            Content = requestContent
+        };
+
+        request.Headers.Add("X-API-Key", _settings.ExtractDocumentApiKey);
+
+        var response = await httpClient.SendAsync(request);
+        var resultContent = await response.Content.ReadAsStringAsync();
+
+        using var jsonDoc = JsonDocument.Parse(resultContent);
+
+        // Check error response
+        if (jsonDoc.RootElement.ValueKind == JsonValueKind.Object &&
+            jsonDoc.RootElement.TryGetProperty("message", out var message) &&
+            message.ValueKind == JsonValueKind.String)
+        {
+            throw new Exception(message.GetString());
+        }
+
+        // Expect exactly one item in result
+        var root = jsonDoc.RootElement;
+        if (root.ValueKind != JsonValueKind.Array || root.GetArrayLength() != 1)
+            throw new Exception("Unexpected response format: expected exactly one extracted document");
+
+        var proposal = root[0];
+        var json = proposal.GetProperty("json");
+
+        return new ExtractedFullContentDocument(
+            json.GetProperty("engTitle").GetString() ?? "",
+            json.GetProperty("vieTitle").GetString() ?? "",
+            json.GetProperty("durationFrom").GetString() ?? "",
+            json.GetProperty("durationTo").GetString() ?? "",
+            json.GetProperty("supervisors").ToString(),
+            json.GetProperty("students").ToString() ?? "",
+            json.GetProperty("context").GetString() ?? "",
+            json.GetProperty("solution").GetString() ?? "",
+            json.GetProperty("abbreviation").GetString() ?? "",
+            json.GetProperty("functionalRequirements").ToString() ?? "",
+            json.GetProperty("nonFunctionalRequirements").ToString() ?? "",
+            json.GetProperty("technicalStack").ToString() ?? "",
+            json.GetProperty("tasks").ToString() ?? "",
+            proposal.GetProperty("text").GetString() ?? ""
+        );
     }
 }
 

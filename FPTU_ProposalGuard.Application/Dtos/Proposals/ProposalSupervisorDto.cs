@@ -2,6 +2,7 @@ namespace FPTU_ProposalGuard.Application.Dtos.Proposals;
 
 public class ProposalSupervisorDto
 {
+    public int ProposalSupervisorId { get; set; }
     public int ProjectProposalId { get; set; }
 
     public string? SupervisorNo { get; set; }

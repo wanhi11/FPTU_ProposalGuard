@@ -2,6 +2,7 @@
 
 public class ProposalStudent
 {
+    public int ProposalStudentId { get; set; }
     public int ProjectProposalId { get; set; }
 
     public string? StudentCode { get; set; }
