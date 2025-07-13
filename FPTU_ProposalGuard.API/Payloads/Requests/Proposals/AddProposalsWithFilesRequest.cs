@@ -26,12 +26,12 @@ public class SimilarityDetail
     public int MatchCount { get; set; }
     public decimal MatchRatio { get; set; } 
     public int LongestContiguous { get; set; }
-    public int OverallScore { get; set; }
+    public double OverallScore { get; set; }
     public List<Segment> Segments { get; set; } = new List<Segment>();
 }
 public class Segment
 {
     public string Text { get; set; } = null!;
     public string UploadedChunkText { get; set; } = null!;
-    public int Score { get; set; }
+    public double Score { get; set; }
 }
