@@ -7,4 +7,5 @@ public interface IProposalSupervisorService<TDto> : IGenericService<ProposalSupe
     where TDto : class
 {
     Task<IServiceResult> GetByEmailAsync(string email);
+    Task ModifyManyAsync(Dictionary<string,List<TDto>> modifyTask,int proposalId);
 }

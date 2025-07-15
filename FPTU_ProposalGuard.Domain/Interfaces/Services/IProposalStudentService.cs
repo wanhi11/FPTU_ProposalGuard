@@ -7,4 +7,5 @@ public interface IProposalStudentService<TDto> : IGenericService<ProposalStudent
     where TDto : class
 {
     Task<IServiceResult> CreateManyAsync(IEnumerable<TDto> dtos);
+    Task ModifyManyAsync(Dictionary<string,List<TDto>> modifyTask,int proposalId);
 }
