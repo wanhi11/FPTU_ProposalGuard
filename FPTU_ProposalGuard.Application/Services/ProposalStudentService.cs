@@ -7,6 +7,7 @@ using FPTU_ProposalGuard.Domain.Interfaces.Services;
 using FPTU_ProposalGuard.Domain.Interfaces.Services.Base;
 using FPTU_ProposalGuard.Domain.Specifications;
 using MapsterMapper;
+using Microsoft.AspNetCore.Mvc;
 using Serilog;
 
 namespace FPTU_ProposalGuard.Application.Services;
@@ -59,6 +60,61 @@ public class ProposalStudentService(
         {
             _logger.Error(ex.Message);
             throw new Exception("Error invoke when progress create many proposal students");
+        }
+    }
+
+    public async Task ModifyManyAsync(Dictionary<string, List<ProposalStudentDto>> modifyTask,int proposalId)
+    {
+        try
+        {
+            if (modifyTask == null || !modifyTask.Any())
+            {
+                return;
+            }
+
+            foreach (var task in modifyTask)
+            {
+                var action = task.Key;
+                var dtos = task.Value;
+
+                if (action.ToLower() == "create")
+                {
+                    var entities = dtos.Select(dto => _mapper.Map<ProposalStudent>(dto)).ToList();
+                    _unitOfWork.Repository<ProposalStudent, int>().AddRange(entities);
+                }
+                else if (action.ToLower() == "update")
+                {
+                    foreach (var dto in dtos)
+                    {
+                        var studentSpec = new BaseSpecification<ProposalStudent>(
+                            x => x.StudentCode == dto.StudentCode && x.ProjectProposalId == proposalId);
+                        var student = await _unitOfWork.Repository<ProposalStudent, int>()
+                            .GetWithSpecAsync(studentSpec);
+                        student.Email = dto.Email;
+                        student.FullName = dto.FullName;
+                        student.Phone = dto.Phone;
+                        await _unitOfWork.Repository<ProposalStudent, int>().UpdateAsync(student);
+                    }
+                }
+                else if (action.ToLower() == "delete")
+                {
+                    var studentCodes = dtos.Select(dto => dto.StudentCode).ToList();
+                    var studentSpec = new BaseSpecification<ProposalStudent>(
+                        x => studentCodes.Contains(x.StudentCode));
+                    var studentsToDelete = _unitOfWork.Repository<ProposalStudent, int>()
+                        .GetAllWithSpecAsync(studentSpec).Result.ToList();
+
+                    await _unitOfWork.Repository<ProposalStudent, int>().DeleteRangeAsync(studentsToDelete.Select(s => s.ProposalStudentId)
+                        .ToArray());
+                }
+            }
+
+            await _unitOfWork.SaveChangesAsync() ;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex.Message);
+            throw new Exception("Error invoke when progress modify many proposal students");
         }
     }
 }

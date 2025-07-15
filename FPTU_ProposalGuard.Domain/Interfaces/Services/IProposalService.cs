@@ -12,6 +12,5 @@ public interface IProposalService
     // ,int semesterId, string email);
     Task<IServiceResult> CheckDuplicatedProposal(List<IFormFile> files);
     Task<IServiceResult> UpdateStatus(int historyId,string status, string email);
-    
-    
+    Task<IServiceResult> GetFile(int historyId);
 }

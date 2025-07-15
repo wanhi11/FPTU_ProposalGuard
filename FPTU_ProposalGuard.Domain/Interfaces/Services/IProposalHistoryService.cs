@@ -7,4 +7,5 @@ public interface IProposalHistoryService<TDto> : IGenericService<ProposalHistory
     where TDto : class
 {
     Task<IServiceResult> GetById(int id);
+    Task CreateWithoutSaveAsync(TDto dto);
 }

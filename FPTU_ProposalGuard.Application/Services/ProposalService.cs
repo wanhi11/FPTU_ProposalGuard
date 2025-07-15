@@ -26,6 +26,7 @@ public class ProposalService : IProposalService
     private readonly IExtractService _extractService;
     private readonly IProjectProposalService<ProjectProposalDto> _projectService;
     private readonly IProposalSupervisorService<ProposalSupervisorDto> _supervisorService;
+    private readonly IProposalStudentService<ProposalStudentDto> _studentService;
     private readonly IProposalHistoryService<ProposalHistoryDto> _historyService;
     private readonly IUserService<UserDto> _userService;
     private readonly OpenSearchLowLevelClient _openSearchClient;
@@ -38,6 +39,7 @@ public class ProposalService : IProposalService
         IExtractService extractService,
         IProjectProposalService<ProjectProposalDto> projectService,
         IProposalSupervisorService<ProposalSupervisorDto> supervisorService,
+        IProposalStudentService<ProposalStudentDto> studentService,
         IProposalHistoryService<ProposalHistoryDto> historyService,
         IS3Service s3,
         IUserService<UserDto> userService)
@@ -48,6 +50,7 @@ public class ProposalService : IProposalService
         _extractService = extractService;
         _projectService = projectService;
         _supervisorService = supervisorService;
+        _studentService = studentService;
         _historyService = historyService;
         _userService = userService;
         _s3 = s3;
@@ -297,7 +300,31 @@ public class ProposalService : IProposalService
                 var fileKey = $"{Guid.NewGuid()}_{file.FileName}_1";
                 await _s3.UploadFile(stream, fileKey, file.ContentType);
                 uploadedFileKeys.Add(fileKey);
-
+                var students = JsonSerializer.Deserialize<List<ExtractedProposalStudentDto>>(extracted.Students,
+                        new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        })
+                    ?
+                    .Select(s => new ProposalStudentDto
+                    {
+                        FullName = s.FullName,
+                        StudentCode = s.StudentCode,
+                        Email = s.Email,
+                        Phone = s.Phone
+                    }).ToList() ?? new List<ProposalStudentDto>();
+                var supervisors = JsonSerializer
+                    .Deserialize<List<ExtractedProposalSupervisorDto>>(extracted.Supervisors, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    })
+                    ?
+                    .Select(s => new ProposalSupervisorDto
+                    {
+                        FullName = s.FullName,
+                        Email = s.Email,
+                        Phone = s.Phone
+                    }).ToList() ?? new List<ProposalSupervisorDto>();
                 // 3. Create Proposal
                 var proposal = new ProjectProposalDto
                 {
@@ -317,23 +344,8 @@ public class ProposalService : IProposalService
                     Status = ProjectProposalStatus.Pending,
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = user.UserId.ToString(),
-                    ProposalStudents = JsonSerializer.Deserialize<List<ExtractedProposalStudentDto>>(extracted.Students)
-                        ?
-                        .Select(s => new ProposalStudentDto
-                        {
-                            FullName = s.FullName,
-                            StudentCode = s.StudentCode,
-                            Email = s.Email,
-                            Phone = s.Phone
-                        }).ToList() ?? new List<ProposalStudentDto>(),
-                    ProposalSupervisors = JsonSerializer
-                        .Deserialize<List<ExtractedProposalSupervisorDto>>(extracted.Supervisors)?
-                        .Select(s => new ProposalSupervisorDto
-                        {
-                            FullName = s.FullName,
-                            Email = s.Email,
-                            Phone = s.Phone
-                        }).ToList() ?? new List<ProposalSupervisorDto>()
+                    ProposalStudents = students,
+                    ProposalSupervisors = supervisors
                 };
 
                 // Create history
@@ -399,24 +411,25 @@ public class ProposalService : IProposalService
                 return userResponse;
 
             var user = (userResponse.Data as UserDto)!;
-            
+
             // Check if proposal exists
             var proposal = await _projectService.GetByIdAsync(proposalId);
             if (proposal.ResultCode != ResultCodeConst.SYS_Success0002)
             {
                 return proposal;
             }
+
             var projectProposal = (proposal.Data as ProjectProposalDto)!;
             var latestVersion = projectProposal.ProposalHistories
                 .Max(h => h.Version);
-            
+
             var extracted = await _extractService.ExtractFullContentDocument(file.file);
             // Upload to S3
             var stream = file.file.OpenReadStream();
-            var fileKey = $"{Guid.NewGuid()}_{file.file.FileName}_{latestVersion+1}";
+            var fileKey = $"{Guid.NewGuid()}_{file.file.FileName}_{latestVersion + 1}";
             await _s3.UploadFile(stream, fileKey, file.file.ContentType);
             uploadKey = fileKey;
-            
+
             projectProposal.SemesterId = semesterId;
             projectProposal.VieTitle = extracted.VieTitle;
             projectProposal.EngTitle = extracted.EngTitle;
@@ -430,27 +443,36 @@ public class ProposalService : IProposalService
                 : DateOnly.FromDateTime(DateTime.Today.AddMonths(4));
             projectProposal.Abbreviation = extracted.Abbreviation;
             projectProposal.Status = ProjectProposalStatus.Pending;
-           
+
             // extract and check supervisors and students
             var extractedStudents = JsonSerializer
-                .Deserialize<List<ExtractedProposalStudentDto>>(extracted.Students)?
+                .Deserialize<List<ExtractedProposalStudentDto>>(extracted.Students, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                })?
                 .Select(s => new ProposalStudentDto
                 {
                     FullName = s.FullName,
                     StudentCode = s.StudentCode,
                     Email = s.Email,
-                    Phone = s.Phone
+                    Phone = s.Phone,
+                    ProjectProposalId = proposalId
                 }).ToList() ?? new List<ProposalStudentDto>();
-            
+
             var extractedSupervisors = JsonSerializer
-                .Deserialize<List<ExtractedProposalSupervisorDto>>(extracted.Supervisors)?
+                .Deserialize<List<ExtractedProposalSupervisorDto>>(extracted.Supervisors,
+                    new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    })?
                 .Select(s => new ProposalSupervisorDto
                 {
                     FullName = s.FullName,
                     Email = s.Email,
-                    Phone = s.Phone
+                    Phone = s.Phone,
+                    ProjectProposalId = proposalId
                 }).ToList() ?? new List<ProposalSupervisorDto>();
-            
+
             // sync students
             var studentTask = GetSyncPlan<ProposalStudentDto>(
                 dtoList: projectProposal.ProposalStudents!.ToList(),
@@ -461,7 +483,7 @@ public class ProposalService : IProposalService
                     a.Email != b.Email ||
                     a.Phone != b.Phone
             );
-            
+
             //sync supervisors
             var supervisorTask = GetSyncPlan<ProposalSupervisorDto>(
                 dtoList: projectProposal.ProposalSupervisors!.ToList(),
@@ -471,12 +493,58 @@ public class ProposalService : IProposalService
                     a.FullName != b.FullName ||
                     a.Phone != b.Phone
             );
-            return new ServiceResult();
+
+            // Reupload Student details
+            await _studentService.ModifyManyAsync(studentTask, proposalId);
+
+            // Reupload Supervisor details
+            await _supervisorService.ModifyManyAsync(supervisorTask, proposalId);
+
+            // Create new history
+            var history = file.fileDetail is ProposalHistoryDto dto
+                ? new ProposalHistoryDto
+                {
+                    Status = dto.Status,
+                    Version = dto.Version,
+                    Url = fileKey,
+                    ProcessById = user.UserId,
+                    ProcessDate = DateTime.UtcNow,
+                    Comment = dto.Comment,
+                    SimilarProposals = dto.SimilarProposals,
+                    ProjectProposalId = proposalId
+                }
+                : new ProposalHistoryDto
+                {
+                    Status = ProjectProposalStatus.Pending.ToString(),
+                    Version = 1,
+                    Url = fileKey,
+                    ProcessById = user.UserId,
+                    ProcessDate = DateTime.UtcNow,
+                    ProjectProposalId = proposalId
+                };
+
+            await _historyService.CreateWithoutSaveAsync(history);
+            // Update Proposal
+            var updateResult = await _projectService.UpdateAsync(proposalId, projectProposal);
+
+            if (updateResult.ResultCode != ResultCodeConst.SYS_Success0003)
+            {
+                await _s3.DeleteFile(fileKey);
+                return updateResult;
+            }
+
+            return new ServiceResult(ResultCodeConst.SYS_Success0003,
+                await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0003));
         }
         catch (Exception ex)
         {
-            Console.WriteLine(ex);
-            throw;
+            if (uploadKey != string.Empty)
+            {
+                await _s3.DeleteFile(uploadKey);
+            }
+
+            return new ServiceResult(ResultCodeConst.Proposal_Warning0001,
+                await _msgService.GetMessageAsync(ResultCodeConst.Proposal_Warning0001) + ": " + ex.Message);
         }
     }
 
@@ -610,13 +678,16 @@ public class ProposalService : IProposalService
                         await _msgService.GetMessageAsync(ResultCodeConst.SYS_Warning0002) + ": File not found");
                 }
 
-                var file = ConvertS3ToIFormFile(s3File, history.Url);
+                // var file = ConvertS3ToIFormFile(s3File, history.Url);
 
-                var extracted = await _extractService.ExtractFullContentDocument(file);
+                // var extracted = await _extractService.ExtractFullContentDocument(file);
+                var rawString = history.ProjectProposal.EngTitle + " " +
+                                history.ProjectProposal.ContextText + " " +
+                                history.ProjectProposal.SolutionText;
 
                 await UploadChunks(new List<(int, string, string)>
                 {
-                    (history.ProjectProposalId, extracted.Text, extracted.EngTitle)
+                    (history.ProjectProposalId, rawString, history.ProjectProposal.EngTitle)
                 });
             }
 
@@ -628,6 +699,34 @@ public class ProposalService : IProposalService
             _logger.Error(ex.Message);
             throw new Exception("Error invoke when progress update status and upload to opensearch");
         }
+    }
+
+    public async Task<IServiceResult> GetFile(int historyId)
+    {
+        try
+        {
+            var historyResponse = await _historyService.GetById(historyId);
+            if (historyResponse.ResultCode != ResultCodeConst.SYS_Success0002)
+                return historyResponse;
+
+            var history = (historyResponse.Data as ProposalHistoryDto)!;
+            var s3File = await _s3.GetFile(history.Url);
+
+            var resultData = ConvertS3ToStreamResult(s3File, history.Url);
+
+            return new ServiceResult(ResultCodeConst.SYS_Success0002,
+                await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0002))
+            {
+                Data = resultData
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex.Message);
+            return new ServiceResult(ResultCodeConst.Proposal_Warning0001,
+                await _msgService.GetMessageAsync(ResultCodeConst.Proposal_Warning0001) + ": " + ex.Message);
+        }
+        
     }
 
     private async Task<List<List<ProposalMatch>>> QueryChunks(List<List<double>> vectors, int k = 5)
@@ -768,7 +867,8 @@ public class ProposalService : IProposalService
         return dotProduct / (Math.Sqrt(normA) * Math.Sqrt(normB));
     }
 
-    private IFormFile ConvertS3ToIFormFile(GetObjectResponse s3File, string fileKey)
+    private (Stream Stream, string ContentType, string FileName) ConvertS3ToStreamResult(GetObjectResponse s3File,
+        string fileKey)
     {
         var memoryStream = new MemoryStream();
         s3File.ResponseStream.CopyTo(memoryStream);
@@ -777,7 +877,6 @@ public class ProposalService : IProposalService
         var contentType = s3File.Headers.ContentType;
         if (string.IsNullOrWhiteSpace(contentType))
         {
-            // Guess fallback if needed
             var extension = Path.GetExtension(fileKey).ToLower();
             contentType = extension switch
             {
@@ -787,24 +886,20 @@ public class ProposalService : IProposalService
             };
         }
 
-        return new FormFile(memoryStream, 0, memoryStream.Length, "file", fileKey)
-        {
-            Headers = new HeaderDictionary(),
-            ContentType = contentType
-        };
+        return (memoryStream, contentType, RemoveGuidPrefix(fileKey));
     }
 
-    private List<(string Action, List<T> Data)> GetSyncPlan<T>(
+    private Dictionary<string, List<T>> GetSyncPlan<T>(
         List<T> dtoList,
         List<T> extractedList,
         Func<T, string> keySelector,
         Func<T, T, bool> isDifferent)
     {
-        var result = new List<(string Action, List<T> Data)>();
-        
+        var result = new Dictionary<string, List<T>>();
+
         var dbDict = dtoList.ToDictionary(keySelector);
         var extractedDict = extractedList.ToDictionary(keySelector);
-        
+
         var toCreate = new List<T>();
         var toUpdate = new List<T>();
         var toDelete = new List<T>();
@@ -821,6 +916,7 @@ public class ProposalService : IProposalService
                 toUpdate.Add(extracted);
             }
         }
+
         foreach (var dbItem in dtoList)
         {
             var key = keySelector(dbItem);
@@ -830,11 +926,19 @@ public class ProposalService : IProposalService
             }
         }
 
-        if (toCreate.Any()) result.Add(("Create", toCreate));
-        if (toUpdate.Any()) result.Add(("Update", toUpdate));
-        if (toDelete.Any()) result.Add(("Delete", toDelete));
+        if (toCreate.Any()) result["Create"] = toCreate;
+        if (toUpdate.Any()) result["Update"] = toUpdate;
+        if (toDelete.Any()) result["Delete"] = toDelete;
 
         return result;
     }
-
+    private string RemoveGuidPrefix(string fileName)
+    {
+        var parts = fileName.Split('_');
+        if (Guid.TryParse(parts[0], out _))
+        {
+            return string.Join('_', parts.Skip(1));
+        }
+        return fileName;
+    }
 }

@@ -50,6 +50,12 @@ public class ProposalHistoryService(
         }
     }
 
+    public async Task CreateWithoutSaveAsync(ProposalHistoryDto dto)
+    {
+        await _unitOfWork.Repository<ProposalHistory, int>()
+            .AddAsync(_mapper.Map<ProposalHistory>(dto));
+    }
+
     public override async Task<IServiceResult> UpdateAsync(int id, ProposalHistoryDto dto)
     {
         try

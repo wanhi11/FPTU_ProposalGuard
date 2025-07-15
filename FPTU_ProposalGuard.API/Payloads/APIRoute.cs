@@ -109,6 +109,7 @@ public class APIRoute
     {
         //[GET]
         public const string GetById = Base + "/proposals/{id}";
+        public const string GetFile = Base + "/proposals/files/{historyId}";
         //[POST]
         public const string AddProposalsWithFiles = Base + "/proposals/files";
         public const string AddProposals = Base + "/proposals";
@@ -116,6 +117,7 @@ public class APIRoute
         //[PUT]
         public const string UpdateStatus = Base + "/proposals/history/status";
         public const string ReUploadProposal = Base + "/proposals/re-upload/{proposalId}";
+        
         
     }
 }

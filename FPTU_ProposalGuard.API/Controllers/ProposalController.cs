@@ -52,4 +52,14 @@ public class ProposalController(IProposalService proposalService) : ControllerBa
         var email = HttpContext.User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value!;
         return Ok(await proposalService.ReUploadProposal(req.ToTuple(),req.ProjectProposalId, email, req.SemesterId));
     }
+    
+    // [Authorize]
+    [HttpGet(APIRoute.Proposal.GetFile, Name = nameof(GetFile))]
+    public async Task<IActionResult> GetFile([FromRoute]int historyId)
+    {
+        var result =
+            ((Stream Stream, string ContentType, string FileName))(await proposalService.GetFile(historyId)).Data!;
+        return File(result.Stream, result.ContentType, result.FileName);
+    }
+    
 }
