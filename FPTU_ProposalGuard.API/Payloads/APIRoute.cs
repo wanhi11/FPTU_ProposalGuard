@@ -110,6 +110,7 @@ public class APIRoute
         //[GET]
         public const string GetById = Base + "/proposals/{id}";
         public const string GetFile = Base + "/proposals/files/{historyId}";
+        public const string GetAll = Base + "/proposals";
         //[POST]
         public const string AddProposalsWithFiles = Base + "/proposals/files";
         public const string AddProposals = Base + "/proposals";

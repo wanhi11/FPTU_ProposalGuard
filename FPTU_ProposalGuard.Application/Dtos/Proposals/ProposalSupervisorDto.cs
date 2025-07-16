@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace FPTU_ProposalGuard.Application.Dtos.Proposals;
 
 public class ProposalSupervisorDto
@@ -15,6 +17,7 @@ public class ProposalSupervisorDto
 
     public string? TitlePrefix { get; set; }
 
+    [JsonIgnore]
     public ProjectProposalDto ProjectProposal { get; set; } = null!;
 }
 

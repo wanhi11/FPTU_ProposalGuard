@@ -1,4 +1,6 @@
-﻿namespace FPTU_ProposalGuard.Domain.Entities;
+﻿using System.Text.Json.Serialization;
+
+namespace FPTU_ProposalGuard.Domain.Entities;
 
 public class ProposalStudent
 {
@@ -14,6 +16,6 @@ public class ProposalStudent
     public string? Email { get; set; }
 
     public string? RoleInGroup { get; set; }
-
+    [JsonIgnore]
     public ProjectProposal ProjectProposal { get; set; } = null!;
 }

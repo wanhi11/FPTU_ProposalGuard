@@ -1,4 +1,5 @@
 using FPTU_ProposalGuard.Application.Common;
+using FPTU_ProposalGuard.Application.Dtos;
 using FPTU_ProposalGuard.Application.Dtos.Notifications;
 using FPTU_ProposalGuard.Application.Dtos.Proposals;
 using FPTU_ProposalGuard.Application.Exceptions;
@@ -8,6 +9,7 @@ using FPTU_ProposalGuard.Domain.Interfaces.Repositories;
 using FPTU_ProposalGuard.Domain.Interfaces.Services;
 using FPTU_ProposalGuard.Domain.Interfaces.Services.Base;
 using FPTU_ProposalGuard.Domain.Specifications;
+using FPTU_ProposalGuard.Domain.Specifications.Interfaces;
 using FPTU_ProposalGuard.Domain.Specifications.Params;
 using Mapster;
 using MapsterMapper;
@@ -141,5 +143,64 @@ public class ProjectProposalService(
         }
 
         return serviceResult;
+    }
+
+    public override async Task<IServiceResult> GetAllWithSpecAsync(ISpecification<ProjectProposal> specification,
+        bool tracked = true)
+    {
+        try
+        {
+            var proposalSpec = specification as ProposalSpecification;
+            if (proposalSpec == null)
+            {
+                return new ServiceResult(ResultCodeConst.SYS_Fail0002,
+                    await _msgService.GetMessageAsync(ResultCodeConst.SYS_Fail0002));
+            }
+
+            // Count total proposals
+            var totalCount = await _projectProposalRepository.CountAsync(specification);
+            // Count total page
+            var totalPage = (int)Math.Ceiling((double)totalCount / proposalSpec.PageSize);
+
+            // Set pagination to specification after count total proposal 
+            if (proposalSpec.PageIndex > totalPage
+                || proposalSpec.PageIndex < 1) // Exceed total page or page index smaller than 1
+            {
+                proposalSpec.PageIndex = 1; // Set default to first page
+            }
+
+            // Apply pagination
+            proposalSpec.ApplyPaging(
+                skip: proposalSpec.PageSize * (proposalSpec.PageIndex - 1),
+                take: proposalSpec.PageSize);
+
+            var entities = await _unitOfWork.Repository<ProjectProposal, int>()
+                .GetAllWithSpecAsync(specification, tracked);
+
+            if (entities.Any())
+            {
+                // Convert to dto collection 
+                var proposalDtos = _mapper.Map<IEnumerable<ProjectProposalDto>>(entities);
+
+                // Pagination result 
+                var paginationResultDto = new PaginatedResultDto<ProjectProposalDto>(proposalDtos,
+                    proposalSpec.PageIndex, proposalSpec.PageSize, totalPage, totalCount);
+
+                // Response with pagination 
+                return new ServiceResult(ResultCodeConst.SYS_Success0002,
+                    await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0002), paginationResultDto);
+            } 
+            // Not found any data
+
+            return new ServiceResult(ResultCodeConst.SYS_Warning0004,
+                await _msgService.GetMessageAsync(ResultCodeConst.SYS_Warning0004),
+                // Mapping entities to dto and ignore sensitive user data
+                _mapper.Map<IEnumerable<ProjectProposalDto>>(entities).ToList());
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex.Message);
+            throw new Exception("Error invoke when progress get all data");
+        }
     }
 }
