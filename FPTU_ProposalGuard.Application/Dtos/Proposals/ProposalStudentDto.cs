@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace FPTU_ProposalGuard.Application.Dtos.Proposals;
 
 public class ProposalStudentDto
@@ -14,6 +16,7 @@ public class ProposalStudentDto
 
     public string? RoleInGroup { get; set; }
 
+    [JsonIgnore]
     public ProjectProposalDto ProjectProposal { get; set; } = null!;
 }
 

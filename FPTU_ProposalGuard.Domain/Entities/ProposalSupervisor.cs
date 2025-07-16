@@ -1,4 +1,6 @@
-﻿namespace FPTU_ProposalGuard.Domain.Entities;
+﻿using System.Text.Json.Serialization;
+
+namespace FPTU_ProposalGuard.Domain.Entities;
 
 public class ProposalSupervisor
 {
@@ -14,6 +16,6 @@ public class ProposalSupervisor
     public string? Email { get; set; }
 
     public string? TitlePrefix { get; set; }
-
+    [JsonIgnore]
     public ProjectProposal ProjectProposal { get; set; } = null!;
 }

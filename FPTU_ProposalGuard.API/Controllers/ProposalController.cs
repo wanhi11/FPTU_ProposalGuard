@@ -2,16 +2,24 @@ using System.Security.Claims;
 using FPTU_ProposalGuard.API.Extensions;
 using FPTU_ProposalGuard.API.Payloads;
 using FPTU_ProposalGuard.API.Payloads.Requests.Proposals;
+using FPTU_ProposalGuard.Application.Configurations;
 using FPTU_ProposalGuard.Application.Dtos.Proposals;
 using FPTU_ProposalGuard.Domain.Interfaces.Services;
+using FPTU_ProposalGuard.Domain.Specifications;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.Extensions.Options;
 
 namespace FPTU_ProposalGuard.API.Controllers;
 
-public class ProposalController(IProposalService proposalService) : ControllerBase
+public class ProposalController(IProposalService proposalService,
+    IProjectProposalService<ProjectProposalDto> projectProposalService,
+    IOptionsMonitor<AppSettings> monitor
+    ) : ControllerBase
 {
+    private readonly AppSettings _appSettings = monitor.CurrentValue;
+    
     [Authorize]
     [HttpPost(APIRoute.Proposal.AddProposalsWithFiles, Name = nameof(AddProposalsWithFiles))]
     public async Task<IActionResult> AddProposalsWithFiles([FromForm] AddProposalsWithFilesRequest req)
@@ -53,7 +61,7 @@ public class ProposalController(IProposalService proposalService) : ControllerBa
         return Ok(await proposalService.ReUploadProposal(req.ToTuple(),req.ProjectProposalId, email, req.SemesterId));
     }
     
-    // [Authorize]
+    [Authorize]
     [HttpGet(APIRoute.Proposal.GetFile, Name = nameof(GetFile))]
     public async Task<IActionResult> GetFile([FromRoute]int historyId)
     {
@@ -62,4 +70,22 @@ public class ProposalController(IProposalService proposalService) : ControllerBa
         return File(result.Stream, result.ContentType, result.FileName);
     }
     
+    // [Authorize]
+    [HttpGet(APIRoute.Proposal.GetAll, Name = nameof(GetAll))]
+    public async Task<IActionResult> GetAll([FromQuery] ProposalSpecParams specParams)
+    {
+        var result = await projectProposalService.GetAllWithSpecAsync(new ProposalSpecification(
+            specParams: specParams,
+            pageIndex: specParams.PageIndex ?? 1,
+            pageSize: specParams.PageSize ?? _appSettings.PageSize));
+        
+        return Ok(result);
+    }
+    
+    // [Authorize]
+    [HttpGet(APIRoute.Proposal.GetById, Name = nameof(GetById))]
+    public async Task<IActionResult> GetById([FromRoute] int id)
+    {
+        return Ok(await projectProposalService.GetByIdAsync(id));
+    }
 }
