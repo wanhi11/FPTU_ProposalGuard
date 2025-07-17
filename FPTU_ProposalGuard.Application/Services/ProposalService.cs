@@ -736,7 +736,7 @@ public class ProposalService : IProposalService
         vectors.ForEach(vector =>
         {
             mSearchPayload
-                .AppendLine(JsonSerializer.Serialize(new { index = "topics" }))
+                .AppendLine(JsonSerializer.Serialize(new { index = "proposals" }))
                 .AppendLine(JsonSerializer.Serialize(new
                 {
                     size = k,
@@ -795,7 +795,7 @@ public class ProposalService : IProposalService
                 {
                     index = new
                     {
-                        _index = "topics",
+                        _index = "proposals",
                         _id = $"{proposal.ProjectProposalId}_{chunk.ChunkId}"
                     }
                 };
