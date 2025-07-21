@@ -1,4 +1,6 @@
-﻿namespace FPTU_ProposalGuard.Domain.Entities;
+﻿using System.Text.Json.Serialization;
+
+namespace FPTU_ProposalGuard.Domain.Entities;
 
 public class ProposalHistory
 {
@@ -17,7 +19,9 @@ public class ProposalHistory
     public string? Comment { get; set; }
 
     public User ProcessBy { get; set; } = null!;
-
+    
+    [JsonIgnore]
     public ProjectProposal ProjectProposal { get; set; } = null!;
+    [JsonIgnore]
     public ICollection<ProposalSimilarity> SimilarProposals { get; set; } = new List<ProposalSimilarity>();
 }

@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using FPTU_ProposalGuard.Application.Dtos.Users;
 
 namespace FPTU_ProposalGuard.Application.Dtos.Proposals;
@@ -20,6 +21,7 @@ public class ProposalHistoryDto
 
     public UserDto ProcessBy { get; set; } = null!;
 
+    [JsonIgnore]
     public ProjectProposalDto ProjectProposal { get; set; } = null!;
     public ICollection<ProposalSimilarityDto> SimilarProposals { get; set; } = new List<ProposalSimilarityDto>();
 }

@@ -11,6 +11,6 @@ public interface IProposalService
     // Task<IServiceResult> AddProposals(List<(string Name,string Context, string Solution, string Text)> contexts
     // ,int semesterId, string email);
     Task<IServiceResult> CheckDuplicatedProposal(List<IFormFile> files);
-    Task<IServiceResult> UpdateStatus(int historyId,string status, string email);
+    Task<IServiceResult> UpdateStatus(int proposalId,bool isApproved, string email);
     Task<IServiceResult> GetFile(int historyId);
 }

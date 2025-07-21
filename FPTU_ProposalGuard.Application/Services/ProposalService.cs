@@ -345,7 +345,10 @@ public class ProposalService : IProposalService
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = user.UserId.ToString(),
                     ProposalStudents = students,
-                    ProposalSupervisors = supervisors
+                    ProposalSupervisors = supervisors,
+                    FunctionalRequirements = JsonSerializer.Deserialize<List<string>>(extracted.FunctionalRequirements)!,
+                    NonFunctionalRequirements = JsonSerializer.Deserialize<List<string>>(extracted.NonFunctionalRequirements)!,
+                    TechnicalStack = JsonSerializer.Deserialize<List<string>>(extracted.TechnicalStack)!,
                 };
 
                 // Create history
@@ -420,6 +423,7 @@ public class ProposalService : IProposalService
             }
 
             var projectProposal = (proposal.Data as ProjectProposalDto)!;
+            projectProposal.Status = ProjectProposalStatus.Pending;
             var latestVersion = projectProposal.ProposalHistories
                 .Max(h => h.Version);
 
@@ -443,7 +447,12 @@ public class ProposalService : IProposalService
                 : DateOnly.FromDateTime(DateTime.Today.AddMonths(4));
             projectProposal.Abbreviation = extracted.Abbreviation;
             projectProposal.Status = ProjectProposalStatus.Pending;
-
+            projectProposal.FunctionalRequirements =
+                JsonSerializer.Deserialize<List<string>>(extracted.FunctionalRequirements)!;
+            projectProposal.NonFunctionalRequirements =
+                JsonSerializer.Deserialize<List<string>>(extracted.NonFunctionalRequirements)!;
+            projectProposal.TechnicalStack = JsonSerializer.Deserialize<List<string>>(extracted.TechnicalStack)!;
+            
             // extract and check supervisors and students
             var extractedStudents = JsonSerializer
                 .Deserialize<List<ExtractedProposalStudentDto>>(extracted.Students, new JsonSerializerOptions
@@ -458,21 +467,7 @@ public class ProposalService : IProposalService
                     Phone = s.Phone,
                     ProjectProposalId = proposalId
                 }).ToList() ?? new List<ProposalStudentDto>();
-
-            var extractedSupervisors = JsonSerializer
-                .Deserialize<List<ExtractedProposalSupervisorDto>>(extracted.Supervisors,
-                    new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    })?
-                .Select(s => new ProposalSupervisorDto
-                {
-                    FullName = s.FullName,
-                    Email = s.Email,
-                    Phone = s.Phone,
-                    ProjectProposalId = proposalId
-                }).ToList() ?? new List<ProposalSupervisorDto>();
-
+            
             // sync students
             var studentTask = GetSyncPlan<ProposalStudentDto>(
                 dtoList: projectProposal.ProposalStudents!.ToList(),
@@ -483,29 +478,16 @@ public class ProposalService : IProposalService
                     a.Email != b.Email ||
                     a.Phone != b.Phone
             );
-
-            //sync supervisors
-            var supervisorTask = GetSyncPlan<ProposalSupervisorDto>(
-                dtoList: projectProposal.ProposalSupervisors!.ToList(),
-                extractedList: extractedSupervisors,
-                keySelector: s => s.Email!,
-                isDifferent: (a, b) =>
-                    a.FullName != b.FullName ||
-                    a.Phone != b.Phone
-            );
-
+            
             // Reupload Student details
             await _studentService.ModifyManyAsync(studentTask, proposalId);
-
-            // Reupload Supervisor details
-            await _supervisorService.ModifyManyAsync(supervisorTask, proposalId);
-
+            
             // Create new history
             var history = file.fileDetail is ProposalHistoryDto dto
                 ? new ProposalHistoryDto
                 {
                     Status = dto.Status,
-                    Version = dto.Version,
+                    Version = latestVersion + 1,
                     Url = fileKey,
                     ProcessById = user.UserId,
                     ProcessDate = DateTime.UtcNow,
@@ -516,7 +498,7 @@ public class ProposalService : IProposalService
                 : new ProposalHistoryDto
                 {
                     Status = ProjectProposalStatus.Pending.ToString(),
-                    Version = 1,
+                    Version =  latestVersion + 1,
                     Url = fileKey,
                     ProcessById = user.UserId,
                     ProcessDate = DateTime.UtcNow,
@@ -625,7 +607,7 @@ public class ProposalService : IProposalService
         }
     }
 
-    public async Task<IServiceResult> UpdateStatus(int historyId, string status, string email)
+    public async Task<IServiceResult> UpdateStatus(int proposalId, bool isApproved, string email)
     {
         try
         {
@@ -635,62 +617,41 @@ public class ProposalService : IProposalService
 
             var user = (userResponse.Data as UserDto)!;
 
-            var historyResponse = await _historyService.GetById(historyId);
-            if (historyResponse.ResultCode != ResultCodeConst.SYS_Success0002)
-                return historyResponse;
+            var proposalResponse = await _projectService.GetByIdAsync(proposalId);
+            if(proposalResponse.ResultCode != ResultCodeConst.SYS_Success0002)
+                return proposalResponse;
 
-            var history = (historyResponse.Data as ProposalHistoryDto)!;
-            if (history.ProcessById.Equals(user.UserId))
-            {
+            var proposal = proposalResponse.Data as ProjectProposalDto;
+            
+            if(proposal!.ApproverId.Equals(user.UserId))
+            {            
                 return new ServiceResult(ResultCodeConst.Proposal_Warning0003,
                     await _msgService.GetMessageAsync(ResultCodeConst.Proposal_Warning0003));
             }
 
-            if (history.Status == "Approved" ||
-                (history.Status == "Pending" && status is not ("Approved" or "Rejected")))
+            if (proposal.Status == ProjectProposalStatus.Approved)
             {
                 return new ServiceResult(ResultCodeConst.Proposal_Warning0004,
                     await _msgService.GetMessageAsync(ResultCodeConst.Proposal_Warning0004));
             }
-
-            history.Status = status;
-            history.ProjectProposal.Status = status switch
-            {
-                "Approved" => ProjectProposalStatus.Approved,
-                "Rejected" => ProjectProposalStatus.Rejected,
-                "Pending" => ProjectProposalStatus.Pending,
-                _ => history.ProjectProposal.Status
-            };
-            history.ProjectProposal.ApproverId = user.UserId;
-
-            var updateResult = await _historyService.UpdateAsync(historyId, history);
+            
+            var updateResult = await _projectService.UpdateStatus(proposalId, true);
             if (updateResult.ResultCode != ResultCodeConst.SYS_Success0003)
             {
                 return updateResult;
             }
 
-            if (status == ProjectProposalStatus.Approved.ToString())
+            if (isApproved)
             {
-                var s3File = await _s3.GetFile(history.Url);
-                if (s3File == null)
-                {
-                    return new ServiceResult(ResultCodeConst.SYS_Warning0002,
-                        await _msgService.GetMessageAsync(ResultCodeConst.SYS_Warning0002) + ": File not found");
-                }
-
-                // var file = ConvertS3ToIFormFile(s3File, history.Url);
-
-                // var extracted = await _extractService.ExtractFullContentDocument(file);
-                var rawString = history.ProjectProposal.EngTitle + " " +
-                                history.ProjectProposal.ContextText + " " +
-                                history.ProjectProposal.SolutionText;
-
+                var rawString = proposal.EngTitle + " " +
+                                proposal.ContextText + " " +
+                                proposal.SolutionText;
                 await UploadChunks(new List<(int, string, string)>
                 {
-                    (history.ProjectProposalId, rawString, history.ProjectProposal.EngTitle)
+                    (proposal.ProjectProposalId, rawString, proposal.EngTitle)
                 });
             }
-
+            
             return new ServiceResult(ResultCodeConst.SYS_Success0003,
                 await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0003));
         }

@@ -1,8 +1,11 @@
+using System.Text.Json;
 using FPTU_ProposalGuard.Application.Common;
 using FPTU_ProposalGuard.Application.Dtos;
 using FPTU_ProposalGuard.Application.Dtos.Notifications;
 using FPTU_ProposalGuard.Application.Dtos.Proposals;
 using FPTU_ProposalGuard.Application.Exceptions;
+using FPTU_ProposalGuard.Application.Services.IExternalServices;
+using FPTU_ProposalGuard.Domain.Common.Enums;
 using FPTU_ProposalGuard.Domain.Entities;
 using FPTU_ProposalGuard.Domain.Interfaces;
 using FPTU_ProposalGuard.Domain.Interfaces.Repositories;
@@ -23,6 +26,7 @@ public class ProjectProposalService(
     IUnitOfWork unitOfWork,
     IMapper mapper,
     IGenericRepository<ProjectProposal, int> projectProposalRepository,
+    IS3Service s3Service,
     ILogger logger)
     : GenericService<ProjectProposal, ProjectProposalDto, int>(msgService, unitOfWork, mapper, logger),
         IProjectProposalService<ProjectProposalDto>
@@ -75,12 +79,18 @@ public class ProjectProposalService(
                 await _msgService.GetMessageAsync(ResultCodeConst.SYS_Warning0004));
         }
 
+        var resultData = _mapper.Map<ProjectProposalDto>(entity);
+        foreach (var history in resultData.ProposalHistories)
+        {
+            history.Url = (await s3Service.GetFileUrl(history.Url))!;
+        }
+        
         return new ServiceResult(ResultCodeConst.SYS_Success0002,
             await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0002),
-            _mapper.Map<ProjectProposalDto>(entity));
+            resultData);
     }
 
-    public override async Task<IServiceResult> UpdateAsync(int id, ProjectProposalDto dto)
+    public async Task<IServiceResult> UpdateAsync(int id, ProjectProposalDto dto)
     {
         // Initiate service result
         var serviceResult = new ServiceResult();
@@ -96,16 +106,26 @@ public class ProjectProposalService(
             }
 
             // Process add update entity
-            // Map properties from dto to existingEntity
-            var localConfig = new TypeAdapterConfig();
+                // Map properties from dto to existingEntity
+                var localConfig = new TypeAdapterConfig();
 
-            localConfig.NewConfig<ProjectProposalDto, ProjectProposal>()
-                .IgnoreNullValues(true)
-                .Ignore(dest => dest.ProposalHistories)
-                .Ignore(dest => dest.ProposalStudents)
-                .Ignore(dest => dest.ProposalSupervisors);
-            dto.Adapt(existingEntity, localConfig);
+                localConfig.NewConfig<ProjectProposalDto, ProjectProposal>()
+                    .Map(dest => dest.FunctionalRequirements,
+                        src => JsonSerializer.Serialize(src.FunctionalRequirements, (JsonSerializerOptions?)null))
+                    .Map(dest => dest.NonFunctionalRequirements,
+                        src => JsonSerializer.Serialize(src.NonFunctionalRequirements, (JsonSerializerOptions?)null))
+                    .Map(dest => dest.TechnicalStack,
+                        src => JsonSerializer.Serialize(src.TechnicalStack, (JsonSerializerOptions?)null))
+                    .Ignore(dest => dest.ProposalHistories)
+                    .Ignore(dest => dest.ProposalStudents)
+                    .Ignore(dest => dest.ProposalSupervisors)
+                    .IgnoreNullValues(true);
+                dto.Adapt(existingEntity, localConfig);
 
+            // Progress update when all require passed
+            await _unitOfWork.Repository<ProjectProposal, int>()
+                .UpdateAsync(existingEntity);
+            
             // Check if there are any differences between the original and the updated entity
             if (!_unitOfWork.Repository<ProjectProposal, int>().HasChanges(existingEntity))
             {
@@ -115,9 +135,66 @@ public class ProjectProposalService(
                 return serviceResult;
             }
 
-            // Progress update when all require passed
-            await _unitOfWork.Repository<ProjectProposal, int>().UpdateAsync(existingEntity);
+            // Save changes to DB
+            var rowsAffected = await _unitOfWork.SaveChangesAsync();
+            if (rowsAffected == 0)
+            {
+                serviceResult.ResultCode = ResultCodeConst.SYS_Fail0003;
+                serviceResult.Message = await _msgService.GetMessageAsync(ResultCodeConst.SYS_Fail0003);
+                serviceResult.Data = false;
+            }
 
+            // Mark as update success
+            serviceResult.ResultCode = ResultCodeConst.SYS_Success0003;
+            serviceResult.Message = await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0003);
+            serviceResult.Data = true;
+        }
+        catch (UnprocessableEntityException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex.Message);
+            throw;
+        }
+
+        return serviceResult;
+    }
+
+    public async Task<IServiceResult> UpdateStatus(int id, bool isApproved)
+    {
+        // Initiate service result
+        var serviceResult = new ServiceResult();
+        try
+        {
+            // Retrieve the entity
+            var existingEntity = await _unitOfWork.Repository<ProjectProposal, int>().GetByIdAsync(id);
+            if (existingEntity == null)
+            {
+                var errMsg = await _msgService.GetMessageAsync(ResultCodeConst.SYS_Warning0004);
+                return new ServiceResult(ResultCodeConst.SYS_Warning0004, errMsg);
+            }
+            existingEntity.Status = isApproved
+                ? ProjectProposalStatus.Approved
+                : ProjectProposalStatus.Rejected;
+            
+            var latestHistory = existingEntity.ProposalHistories.MaxBy(h => h.Version);
+            latestHistory!.Status = isApproved
+                ? ProjectProposalStatus.Approved.ToString()
+                : ProjectProposalStatus.Rejected.ToString();
+            
+            await _unitOfWork.Repository<ProjectProposal, int>()
+                .UpdateAsync(existingEntity);
+            
+            // Check if there are any differences between the original and the updated entity
+            if (!_unitOfWork.Repository<ProjectProposal, int>().HasChanges(existingEntity))
+            {
+                serviceResult.ResultCode = ResultCodeConst.SYS_Success0003;
+                serviceResult.Message = await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0003);
+                serviceResult.Data = true;
+                return serviceResult;
+            }
             // Save changes to DB
             var rowsAffected = await _unitOfWork.SaveChangesAsync();
             if (rowsAffected == 0)
@@ -180,16 +257,28 @@ public class ProjectProposalService(
             if (entities.Any())
             {
                 // Convert to dto collection 
-                var proposalDtos = _mapper.Map<IEnumerable<ProjectProposalDto>>(entities);
+                var proposalDtos = _mapper.Map<IEnumerable<ProjectProposalDto>>(entities).ToList();
+
+                // change all proposal.history.url to exact url through s3 service
+                foreach (var proposalDto in proposalDtos)
+                {
+                    if (proposalDto.ProposalHistories != null)
+                    {
+                        foreach (var history in proposalDto.ProposalHistories)
+                        {
+                            history.Url = (await s3Service.GetFileUrl(history.Url))!;
+                        }
+                    }
+                }
 
                 // Pagination result 
                 var paginationResultDto = new PaginatedResultDto<ProjectProposalDto>(proposalDtos,
                     proposalSpec.PageIndex, proposalSpec.PageSize, totalPage, totalCount);
 
-                // Response with pagination 
+                // Response with pagination
                 return new ServiceResult(ResultCodeConst.SYS_Success0002,
                     await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0002), paginationResultDto);
-            } 
+            }
             // Not found any data
 
             return new ServiceResult(ResultCodeConst.SYS_Warning0004,
