@@ -32,7 +32,9 @@ public class ProjectProposalDto
 
     public string SolutionText { get; set; } = null!;
 
-    public string? FunctionalRequirements { get; set; }
+    public List<string>? FunctionalRequirements { get; set; }
+    public List<string>? NonFunctionalRequirements { get; set; }
+    public List<string>? TechnicalStack { get; set; }
 
     public string? MainProposalContent { get; set; }
 
@@ -58,4 +60,10 @@ public class ProjectProposalDto
     // [JsonIgnore]
     public ICollection<ProposalSupervisorDto>? ProposalSupervisors { get; set; } = new List<ProposalSupervisorDto>();
     public ICollection<ProposalHistoryDto> ProposalHistories { get; set; } = new List<ProposalHistoryDto>();
+}
+
+public class ExtendProjectProposalDto : ProjectProposalDto
+{
+    public List<String> ProposalStudentNames { get; set; } = new List<string>();
+    public List<String> ProposalSupervisorNames { get; set; } = new List<string>();
 }

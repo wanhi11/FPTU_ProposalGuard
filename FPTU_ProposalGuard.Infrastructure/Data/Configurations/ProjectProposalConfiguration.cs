@@ -36,6 +36,8 @@ public class ProjectProposalConfiguration : IEntityTypeConfiguration<ProjectProp
             .HasMaxLength(255)
             .HasColumnName("eng_title");
         builder.Property(e => e.FunctionalRequirements).HasColumnName("functional_requirements");
+        builder.Property(e => e.NonFunctionalRequirements).HasColumnName("non_functional_requirements");
+        builder.Property(e => e.TechnicalStack).HasColumnName("technical_stack");
         builder.Property(e => e.KindsOfPerson)
             .HasMaxLength(20)
             .HasColumnName("kinds_of_person");

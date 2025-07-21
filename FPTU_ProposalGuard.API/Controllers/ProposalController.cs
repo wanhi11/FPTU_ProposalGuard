@@ -4,6 +4,7 @@ using FPTU_ProposalGuard.API.Payloads;
 using FPTU_ProposalGuard.API.Payloads.Requests.Proposals;
 using FPTU_ProposalGuard.Application.Configurations;
 using FPTU_ProposalGuard.Application.Dtos.Proposals;
+using FPTU_ProposalGuard.Domain.Common.Enums;
 using FPTU_ProposalGuard.Domain.Interfaces.Services;
 using FPTU_ProposalGuard.Domain.Specifications;
 using Microsoft.AspNetCore.Authorization;
@@ -13,13 +14,14 @@ using Microsoft.Extensions.Options;
 
 namespace FPTU_ProposalGuard.API.Controllers;
 
-public class ProposalController(IProposalService proposalService,
+public class ProposalController(
+    IProposalService proposalService,
     IProjectProposalService<ProjectProposalDto> projectProposalService,
     IOptionsMonitor<AppSettings> monitor
-    ) : ControllerBase
+) : ControllerBase
 {
     private readonly AppSettings _appSettings = monitor.CurrentValue;
-    
+
     [Authorize]
     [HttpPost(APIRoute.Proposal.AddProposalsWithFiles, Name = nameof(AddProposalsWithFiles))]
     public async Task<IActionResult> AddProposalsWithFiles([FromForm] AddProposalsWithFilesRequest req)
@@ -47,10 +49,10 @@ public class ProposalController(IProposalService proposalService,
 
     [Authorize]
     [HttpPut(APIRoute.Proposal.UpdateStatus, Name = nameof(UpdateStatus))]
-    public async Task<IActionResult> UpdateStatus([FromBody] UpdateProposalStatusRequest req)
+    public async Task<IActionResult> UpdateStatus([FromRoute] int proposalId, [FromQuery] bool isApproved)
     {
         var email = HttpContext.User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value!;
-        return Ok(await proposalService.UpdateStatus(req.HistoryId, req.Status, email));
+        return Ok(await proposalService.UpdateStatus(proposalId, isApproved, email));
     }
 
     [Authorize]
@@ -58,18 +60,18 @@ public class ProposalController(IProposalService proposalService,
     public async Task<IActionResult> ReUploadProposal([FromForm] ReUploadRequest req)
     {
         var email = HttpContext.User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value!;
-        return Ok(await proposalService.ReUploadProposal(req.ToTuple(),req.ProjectProposalId, email, req.SemesterId));
+        return Ok(await proposalService.ReUploadProposal(req.ToTuple(), req.ProjectProposalId, email, req.SemesterId));
     }
-    
+
     [Authorize]
     [HttpGet(APIRoute.Proposal.GetFile, Name = nameof(GetFile))]
-    public async Task<IActionResult> GetFile([FromRoute]int historyId)
+    public async Task<IActionResult> GetFile([FromRoute] int historyId)
     {
         var result =
             ((Stream Stream, string ContentType, string FileName))(await proposalService.GetFile(historyId)).Data!;
         return File(result.Stream, result.ContentType, result.FileName);
     }
-    
+
     // [Authorize]
     [HttpGet(APIRoute.Proposal.GetAll, Name = nameof(GetAll))]
     public async Task<IActionResult> GetAll([FromQuery] ProposalSpecParams specParams)
@@ -78,10 +80,10 @@ public class ProposalController(IProposalService proposalService,
             specParams: specParams,
             pageIndex: specParams.PageIndex ?? 1,
             pageSize: specParams.PageSize ?? _appSettings.PageSize));
-        
+
         return Ok(result);
     }
-    
+
     // [Authorize]
     [HttpGet(APIRoute.Proposal.GetById, Name = nameof(GetById))]
     public async Task<IActionResult> GetById([FromRoute] int id)

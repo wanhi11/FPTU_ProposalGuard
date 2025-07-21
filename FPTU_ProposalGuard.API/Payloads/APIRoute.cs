@@ -116,7 +116,7 @@ public class APIRoute
         public const string AddProposals = Base + "/proposals";
         public const string CheckDuplicatedProposal = Base + "/proposals/check-duplicate";
         //[PUT]
-        public const string UpdateStatus = Base + "/proposals/history/status";
+        public const string UpdateStatus = Base + "/proposals/{proposalId}/status";
         public const string ReUploadProposal = Base + "/proposals/re-upload/{proposalId}";
         
         

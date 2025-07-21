@@ -8,4 +8,6 @@ public interface IProjectProposalService <TDto> : IGenericService<ProjectProposa
 {
     Task<IServiceResult> CreateManyAsync(List<TDto> dtos);
     Task<IServiceResult> GetByIdAsync(int id);
+    Task<IServiceResult> UpdateAsync( int id,TDto dto);
+    Task<IServiceResult> UpdateStatus(int id, bool isApproved);
 }
