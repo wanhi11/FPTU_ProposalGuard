@@ -68,12 +68,15 @@ public class ProjectProposalService(
 
         // Apply include
         baseSpec.ApplyInclude(q =>
-            q.Include(pp => pp.ProposalHistories.OrderByDescending(h => h.Version)
-                    .Take(1))
-                .ThenInclude(h => h.SimilarProposals)
-                .ThenInclude(s => s.MatchedSegments)
-                .Include(pp => pp.ProposalSupervisors!)
-                .Include(pp => pp.ProposalStudents!));
+                q.Include(pp => pp.ProposalHistories.OrderByDescending(h => h.Version)
+                        .Take(1))
+                    .ThenInclude(h => h.SimilarProposals)
+                    .ThenInclude(s => s.MatchedSegments)
+                    .Include(pp => pp.ProposalSupervisors!)
+                    .Include(pp => pp.ProposalHistories.OrderByDescending(h => h.Version)
+                        .Take(1)).ThenInclude(h => h.SimilarProposals).ThenInclude(s => s.ExistingProposal)
+                    .Include(pp => pp.ProposalStudents!))
+            ;
 
         var entity = await _unitOfWork.Repository<ProjectProposal, int>().GetWithSpecAsync(baseSpec);
         if (entity == null)

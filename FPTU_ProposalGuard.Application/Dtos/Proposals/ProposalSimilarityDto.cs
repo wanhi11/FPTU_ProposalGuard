@@ -20,7 +20,7 @@ public class ProposalSimilarityDto
     [JsonIgnore]
     public ProposalHistoryDto ProposalHistory { get; set; } = null!;
 
-    [JsonIgnore]
+    // [JsonIgnore]
     public ProjectProposalDto ExistingProposal { get; set; } = null!;
     
     public ICollection<ProposalMatchedSegmentDto> MatchedSegments { get; set; } = new List<ProposalMatchedSegmentDto>();

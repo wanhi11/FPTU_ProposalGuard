@@ -637,7 +637,7 @@ public class ProposalService : IProposalService
                     await _msgService.GetMessageAsync(ResultCodeConst.Proposal_Warning0004));
             }
             
-            var updateResult = await _projectService.UpdateStatus(proposalId, true);
+            var updateResult = await _projectService.UpdateStatus(proposalId, isApproved);
             if (updateResult.ResultCode != ResultCodeConst.SYS_Success0003)
             {
                 return updateResult;
