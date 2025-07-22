@@ -68,7 +68,10 @@ public class ProjectProposalService(
 
         // Apply include
         baseSpec.ApplyInclude(q =>
-            q.Include(pp => pp.ProposalHistories)
+            q.Include(pp => pp.ProposalHistories.OrderByDescending(h => h.Version)
+                    .Take(1))
+                .ThenInclude(h => h.SimilarProposals)
+                .ThenInclude(s => s.MatchedSegments)
                 .Include(pp => pp.ProposalSupervisors!)
                 .Include(pp => pp.ProposalStudents!));
 
@@ -84,7 +87,7 @@ public class ProjectProposalService(
         {
             history.Url = (await s3Service.GetFileUrl(history.Url))!;
         }
-        
+
         return new ServiceResult(ResultCodeConst.SYS_Success0002,
             await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0002),
             resultData);
@@ -106,26 +109,28 @@ public class ProjectProposalService(
             }
 
             // Process add update entity
-                // Map properties from dto to existingEntity
-                var localConfig = new TypeAdapterConfig();
+            // Map properties from dto to existingEntity
+            var localConfig = new TypeAdapterConfig();
 
-                localConfig.NewConfig<ProjectProposalDto, ProjectProposal>()
-                    .Map(dest => dest.FunctionalRequirements,
-                        src => JsonSerializer.Serialize(src.FunctionalRequirements, (JsonSerializerOptions?)null))
-                    .Map(dest => dest.NonFunctionalRequirements,
-                        src => JsonSerializer.Serialize(src.NonFunctionalRequirements, (JsonSerializerOptions?)null))
-                    .Map(dest => dest.TechnicalStack,
-                        src => JsonSerializer.Serialize(src.TechnicalStack, (JsonSerializerOptions?)null))
-                    .Ignore(dest => dest.ProposalHistories)
-                    .Ignore(dest => dest.ProposalStudents)
-                    .Ignore(dest => dest.ProposalSupervisors)
-                    .IgnoreNullValues(true);
-                dto.Adapt(existingEntity, localConfig);
+            localConfig.NewConfig<ProjectProposalDto, ProjectProposal>()
+                .Map(dest => dest.FunctionalRequirements,
+                    src => JsonSerializer.Serialize(src.FunctionalRequirements, (JsonSerializerOptions?)null))
+                .Map(dest => dest.NonFunctionalRequirements,
+                    src => JsonSerializer.Serialize(src.NonFunctionalRequirements, (JsonSerializerOptions?)null))
+                .Map(dest => dest.TechnicalStack,
+                    src => JsonSerializer.Serialize(src.TechnicalStack, (JsonSerializerOptions?)null))
+                .Map(dest => dest.Tasks,
+                    src => JsonSerializer.Serialize(src.Tasks, (JsonSerializerOptions?)null))
+                .Ignore(dest => dest.ProposalHistories)
+                .Ignore(dest => dest.ProposalStudents)
+                .Ignore(dest => dest.ProposalSupervisors)
+                .IgnoreNullValues(true);
+            dto.Adapt(existingEntity, localConfig);
 
             // Progress update when all require passed
             await _unitOfWork.Repository<ProjectProposal, int>()
                 .UpdateAsync(existingEntity);
-            
+
             // Check if there are any differences between the original and the updated entity
             if (!_unitOfWork.Repository<ProjectProposal, int>().HasChanges(existingEntity))
             {
@@ -175,18 +180,19 @@ public class ProjectProposalService(
                 var errMsg = await _msgService.GetMessageAsync(ResultCodeConst.SYS_Warning0004);
                 return new ServiceResult(ResultCodeConst.SYS_Warning0004, errMsg);
             }
+
             existingEntity.Status = isApproved
                 ? ProjectProposalStatus.Approved
                 : ProjectProposalStatus.Rejected;
-            
+
             var latestHistory = existingEntity.ProposalHistories.MaxBy(h => h.Version);
             latestHistory!.Status = isApproved
                 ? ProjectProposalStatus.Approved.ToString()
                 : ProjectProposalStatus.Rejected.ToString();
-            
+
             await _unitOfWork.Repository<ProjectProposal, int>()
                 .UpdateAsync(existingEntity);
-            
+
             // Check if there are any differences between the original and the updated entity
             if (!_unitOfWork.Repository<ProjectProposal, int>().HasChanges(existingEntity))
             {
@@ -195,6 +201,7 @@ public class ProjectProposalService(
                 serviceResult.Data = true;
                 return serviceResult;
             }
+
             // Save changes to DB
             var rowsAffected = await _unitOfWork.SaveChangesAsync();
             if (rowsAffected == 0)
