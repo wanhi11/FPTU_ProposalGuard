@@ -349,6 +349,7 @@ public class ProposalService : IProposalService
                     FunctionalRequirements = JsonSerializer.Deserialize<List<string>>(extracted.FunctionalRequirements)!,
                     NonFunctionalRequirements = JsonSerializer.Deserialize<List<string>>(extracted.NonFunctionalRequirements)!,
                     TechnicalStack = JsonSerializer.Deserialize<List<string>>(extracted.TechnicalStack)!,
+                    Tasks = JsonSerializer.Deserialize<List<string>>(extracted.Tasks)!
                 };
 
                 // Create history
@@ -452,6 +453,7 @@ public class ProposalService : IProposalService
             projectProposal.NonFunctionalRequirements =
                 JsonSerializer.Deserialize<List<string>>(extracted.NonFunctionalRequirements)!;
             projectProposal.TechnicalStack = JsonSerializer.Deserialize<List<string>>(extracted.TechnicalStack)!;
+            projectProposal.Tasks = JsonSerializer.Deserialize<List<string>>(extracted.Tasks)!;
             
             // extract and check supervisors and students
             var extractedStudents = JsonSerializer

@@ -35,6 +35,7 @@ public class ProjectProposalDto
     public List<string>? FunctionalRequirements { get; set; }
     public List<string>? NonFunctionalRequirements { get; set; }
     public List<string>? TechnicalStack { get; set; }
+    public List<string>? Tasks { get; set; }
 
     public string? MainProposalContent { get; set; }
 

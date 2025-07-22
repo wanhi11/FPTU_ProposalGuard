@@ -34,6 +34,7 @@ public class ProjectProposal : IAuditableEntity
     public string? FunctionalRequirements { get; set; }
     public string? NonFunctionalRequirements { get; set; }
     public string? TechnicalStack { get; set; }
+    public string? Tasks { get; set; }
     public string? MainProposalContent { get; set; }
 
     public ProjectProposalStatus Status { get; set; }

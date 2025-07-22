@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace FPTU_ProposalGuard.Application.Dtos.Proposals;
 
 public class ProposalMatchedSegmentDto
@@ -7,5 +9,6 @@ public class ProposalMatchedSegmentDto
     public string Context { get; set; } = null!;
     public string MatchContext { get; set; } = null!;
     public double MatchPercentage { get; set; }
+    [JsonIgnore]
     public ProposalSimilarityDto ProposalSimilarity { get; set; } = null!;
 }
