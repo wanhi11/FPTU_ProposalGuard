@@ -262,6 +262,12 @@ namespace FPTU_ProposalGuard.Infrastructure.Data.Migrations
                         .HasColumnType("int")
                         .HasColumnName("project_proposal_id");
 
+                    b.Property<string>("ProposalCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("proposal_code");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -508,6 +514,71 @@ namespace FPTU_ProposalGuard.Infrastructure.Data.Migrations
                     b.ToTable("Refresh_Token", (string)null);
                 });
 
+            modelBuilder.Entity("FPTU_ProposalGuard.Domain.Entities.ReviewQuestion", b =>
+                {
+                    b.Property<int>("QuestionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("QuestionId"));
+
+                    b.Property<string>("AnswerType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("answer_type");
+
+                    b.Property<string>("QuestionContent")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("question_content");
+
+                    b.HasKey("QuestionId");
+
+                    b.ToTable("ReviewQuestion", (string)null);
+                });
+
+            modelBuilder.Entity("FPTU_ProposalGuard.Domain.Entities.ReviewSession", b =>
+                {
+                    b.Property<int>("SessionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("session_id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SessionId"));
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("comment");
+
+                    b.Property<int>("HistoryId")
+                        .HasColumnType("int")
+                        .HasColumnName("history_id");
+
+                    b.Property<DateTime?>("ReviewDate")
+                        .HasColumnType("datetime")
+                        .HasColumnName("review_date");
+
+                    b.Property<int>("ReviewStatus")
+                        .HasMaxLength(50)
+                        .HasColumnType("int")
+                        .HasColumnName("review_status");
+
+                    b.Property<Guid>("ReviewerId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("reviewer_id");
+
+                    b.HasKey("SessionId")
+                        .HasName("PK_ReviewSession_SessionId");
+
+                    b.HasIndex("HistoryId");
+
+                    b.HasIndex("ReviewerId");
+
+                    b.ToTable("Review_Session", (string)null);
+                });
+
             modelBuilder.Entity("FPTU_ProposalGuard.Domain.Entities.Semester", b =>
                 {
                     b.Property<int>("SemesterId")
@@ -734,6 +805,42 @@ namespace FPTU_ProposalGuard.Infrastructure.Data.Migrations
                     b.ToTable("User", (string)null);
                 });
 
+            modelBuilder.Entity("FPTU_ProposalGuard.Domain.ReviewAnswer", b =>
+                {
+                    b.Property<int>("AnswerId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("answer_id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AnswerId"));
+
+                    b.Property<bool>("Answer")
+                        .HasColumnType("bit")
+                        .HasColumnName("answer");
+
+                    b.Property<int?>("ProposalHistoryHistoryId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("QuestionId")
+                        .HasColumnType("int")
+                        .HasColumnName("question_id");
+
+                    b.Property<int>("ReviewSessionId")
+                        .HasColumnType("int")
+                        .HasColumnName("review_session_id");
+
+                    b.HasKey("AnswerId")
+                        .HasName("PK_ReviewAnswer_AnswerId");
+
+                    b.HasIndex("ProposalHistoryHistoryId");
+
+                    b.HasIndex("QuestionId");
+
+                    b.HasIndex("ReviewSessionId");
+
+                    b.ToTable("Review_Answer", (string)null);
+                });
+
             modelBuilder.Entity("FPTU_ProposalGuard.Domain.Entities.Notification", b =>
                 {
                     b.HasOne("FPTU_ProposalGuard.Domain.Entities.User", "CreatedBy")
@@ -880,6 +987,26 @@ namespace FPTU_ProposalGuard.Infrastructure.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("FPTU_ProposalGuard.Domain.Entities.ReviewSession", b =>
+                {
+                    b.HasOne("FPTU_ProposalGuard.Domain.Entities.ProposalHistory", "History")
+                        .WithMany("ReviewSessions")
+                        .HasForeignKey("HistoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_ReviewSession_HistoryId");
+
+                    b.HasOne("FPTU_ProposalGuard.Domain.Entities.User", "Reviewer")
+                        .WithMany("ReviewSessions")
+                        .HasForeignKey("ReviewerId")
+                        .IsRequired()
+                        .HasConstraintName("FK_ReviewSession_ReviewerId");
+
+                    b.Navigation("History");
+
+                    b.Navigation("Reviewer");
+                });
+
             modelBuilder.Entity("FPTU_ProposalGuard.Domain.Entities.User", b =>
                 {
                     b.HasOne("FPTU_ProposalGuard.Domain.Entities.SystemRole", "Role")
@@ -889,6 +1016,31 @@ namespace FPTU_ProposalGuard.Infrastructure.Data.Migrations
                         .HasConstraintName("FK_User_RoleId");
 
                     b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("FPTU_ProposalGuard.Domain.ReviewAnswer", b =>
+                {
+                    b.HasOne("FPTU_ProposalGuard.Domain.Entities.ProposalHistory", null)
+                        .WithMany("ReviewAnswers")
+                        .HasForeignKey("ProposalHistoryHistoryId");
+
+                    b.HasOne("FPTU_ProposalGuard.Domain.Entities.ReviewQuestion", "Question")
+                        .WithMany("ReviewAnswers")
+                        .HasForeignKey("QuestionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_ReviewAnswer_QuestionId");
+
+                    b.HasOne("FPTU_ProposalGuard.Domain.Entities.ReviewSession", "ReviewSession")
+                        .WithMany("Answers")
+                        .HasForeignKey("ReviewSessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_ReviewAnswer_SessionId");
+
+                    b.Navigation("Question");
+
+                    b.Navigation("ReviewSession");
                 });
 
             modelBuilder.Entity("FPTU_ProposalGuard.Domain.Entities.Notification", b =>
@@ -911,12 +1063,26 @@ namespace FPTU_ProposalGuard.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("FPTU_ProposalGuard.Domain.Entities.ProposalHistory", b =>
                 {
+                    b.Navigation("ReviewAnswers");
+
+                    b.Navigation("ReviewSessions");
+
                     b.Navigation("SimilarProposals");
                 });
 
             modelBuilder.Entity("FPTU_ProposalGuard.Domain.Entities.ProposalSimilarity", b =>
                 {
                     b.Navigation("MatchedSegments");
+                });
+
+            modelBuilder.Entity("FPTU_ProposalGuard.Domain.Entities.ReviewQuestion", b =>
+                {
+                    b.Navigation("ReviewAnswers");
+                });
+
+            modelBuilder.Entity("FPTU_ProposalGuard.Domain.Entities.ReviewSession", b =>
+                {
+                    b.Navigation("Answers");
                 });
 
             modelBuilder.Entity("FPTU_ProposalGuard.Domain.Entities.Semester", b =>
@@ -942,6 +1108,8 @@ namespace FPTU_ProposalGuard.Infrastructure.Data.Migrations
                     b.Navigation("ProposalHistories");
 
                     b.Navigation("RefreshTokens");
+
+                    b.Navigation("ReviewSessions");
                 });
 #pragma warning restore 612, 618
         }

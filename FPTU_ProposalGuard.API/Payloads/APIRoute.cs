@@ -111,14 +111,51 @@ public class APIRoute
         public const string GetById = Base + "/proposals/{id}";
         public const string GetFile = Base + "/proposals/files/{historyId}";
         public const string GetAll = Base + "/proposals";
+        public const string GetAllUploaded = Base + "/proposals/uploaded";
+        public const string ExportSemesterReport = Base + "/proposals/export-semester-report";
         //[POST]
         public const string AddProposalsWithFiles = Base + "/proposals/files";
+        public const string AddReviewers = Base +"/proposals/reviewers";
         public const string AddProposals = Base + "/proposals";
         public const string CheckDuplicatedProposal = Base + "/proposals/check-duplicate";
+        public const string SubmitReview = Base + "/proposals/{id}/submit-review";
         //[PUT]
         public const string UpdateStatus = Base + "/proposals/{proposalId}/status";
         public const string ReUploadProposal = Base + "/proposals/re-upload/{proposalId}";
         
         
+    }
+    public static class Question
+    {
+        // [GET]
+        public const string GetAllReviewQuestions = Base + "/review-questions";
+        // [POST]
+     
+        // [PATCH]
+       
+        // [PUT]
+      
+    } public static class Semester
+    {
+        // [GET]
+        public const string GetCurrentSemester = Base + "/semesters/current";
+        public const string GetSemesters = Base + "/semesters";
+        // [POST]
+     
+        // [PATCH]
+       
+        // [PUT]
+      
+    }
+
+    public static class ReviewSession
+    {
+        // [GET]
+        public const string GetSessionsToBeReviewed = Base + "/review-sessions/to-be-reviewed";
+        // [POST]
+
+        // [PATCH]
+
+        // [PUT]
     }
 }
