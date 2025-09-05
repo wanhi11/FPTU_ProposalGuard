@@ -63,9 +63,10 @@ jobs:
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'ProposalGuard'
+          app-name: 'checkplagiarism'
           slot-name: 'Production'
           package: ./_net-app
 
           
+
 
