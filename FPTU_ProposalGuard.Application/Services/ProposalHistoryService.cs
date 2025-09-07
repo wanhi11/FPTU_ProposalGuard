@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using FPTU_ProposalGuard.Application.Common;
 using FPTU_ProposalGuard.Application.Dtos.Proposals;
+using FPTU_ProposalGuard.Application.Dtos.Reviews;
 using FPTU_ProposalGuard.Application.Exceptions;
 using FPTU_ProposalGuard.Application.Utils;
 using FPTU_ProposalGuard.Domain;
@@ -70,8 +71,10 @@ public class ProposalHistoryService(
             {
                 // Retrieve by id
                 var baseSpec = new BaseSpecification<ProposalHistory>(x => x.HistoryId == id);
-                baseSpec.ApplyInclude(q => q.Include(h => h.ProjectProposal)
-                    .ThenInclude(pp => pp.Approver)!);
+                baseSpec.ApplyInclude(q => q
+                    .Include(h => h.ReviewSessions)
+                    .Include(h => h.ProjectProposal)
+                        .ThenInclude(pp => pp.Approver)!);
                 var existingEntity = await _unitOfWork.Repository<ProposalHistory, int>().GetWithSpecAsync(baseSpec);
                 if (existingEntity == null)
                 {
@@ -81,7 +84,29 @@ public class ProposalHistoryService(
                         StringUtils.Format(errMsg, "lịch sử để tiến hành sửa đổi"));
                 }
 
-                existingEntity.ReviewSessions = _mapper.Map<List<ReviewSession>>(dto.ReviewSessions);
+                var localConfig = new TypeAdapterConfig();
+                localConfig.NewConfig<ReviewSessionDto, ReviewSession>()
+                    .Ignore(dest => dest.Reviewer) 
+                    .Ignore(dest => dest.History);  
+
+                existingEntity.ReviewSessions ??= new List<ReviewSession>();
+
+                var existingReviewerIds = existingEntity.ReviewSessions.Select(r => r.ReviewerId).ToHashSet();
+                
+                var mappedSessions = dto.ReviewSessions.Adapt<List<ReviewSession>>(localConfig);
+                foreach (var newSession in mappedSessions)
+                {
+                    if (!existingReviewerIds.Contains(newSession.ReviewerId))
+                    {
+                        existingEntity.ReviewSessions.Add(new ReviewSession
+                        {
+                            HistoryId = existingEntity.HistoryId,
+                            ReviewerId = newSession.ReviewerId,
+                            ReviewStatus = newSession.ReviewStatus,
+                            ReviewDate = newSession.ReviewDate
+                        });
+                    }
+                }
                 // Process update
                 await _history.UpdateAsync(existingEntity);
 
@@ -90,7 +115,7 @@ public class ProposalHistoryService(
                 {
                     // Mark as update success
                     return new ServiceResult(ResultCodeConst.SYS_Success0003,
-                        await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0003));
+                        await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0003), true);
                 }
             }
 
@@ -99,12 +124,12 @@ public class ProposalHistoryService(
             {
                 // Mark as update success
                 return new ServiceResult(ResultCodeConst.SYS_Success0003,
-                    await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0003));
+                    await _msgService.GetMessageAsync(ResultCodeConst.SYS_Success0003), true);
             }
 
             // Mark as failed to update
             return new ServiceResult(ResultCodeConst.SYS_Fail0003,
-                await _msgService.GetMessageAsync(ResultCodeConst.SYS_Fail0003));
+                await _msgService.GetMessageAsync(ResultCodeConst.SYS_Fail0003), false);
         }
         catch (Exception ex)
         {
@@ -220,6 +245,8 @@ public class ProposalHistoryService(
         try
         {
             var baseSpec = new BaseSpecification<ProposalHistory>(h => h.ProjectProposalId == proposalId);
+            baseSpec.ApplyInclude(q => q.Include(ph => ph.ReviewSessions));
+
             var latestHistory = (await _unitOfWork.Repository<ProposalHistory, int>()
                 .GetAllWithSpecAsync(baseSpec)).MaxBy(ph => ph.Version);
             if (latestHistory == null)
